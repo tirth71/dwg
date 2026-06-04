@@ -1,0 +1,1969 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SyncDrawing Viewer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg-primary: #1a1d21;
+    --bg-secondary: #212428;
+    --bg-panel: #252830;
+    --bg-toolbar: #1e2126;
+    --bg-hover: #2d3138;
+    --bg-active: #0e639c;
+    --border: #363b44;
+    --border-light: #2e3340;
+    --text-primary: #d4d8e0;
+    --text-secondary: #8a909c;
+    --text-muted: #565d6e;
+    --accent-blue: #1b8fe3;
+    --accent-cyan: #00b4d8;
+    --accent-green: #3ddc84;
+    --accent-orange: #f08040;
+    --accent-red: #e05050;
+    --accent-yellow: #e0b040;
+    --font: 'IBM Plex Sans', sans-serif;
+    --font-mono: 'IBM Plex Mono', monospace;
+    --panel-width: 260px;
+    --toolbar-h: 44px;
+    --header-h: 48px;
+  }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    user-select: none;
+  }
+
+  /* ── HEADER ── */
+  header {
+    height: var(--header-h);
+    background: #141619;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    gap: 8px;
+    flex-shrink: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-right: 12px;
+  }
+
+  .logo-icon {
+    width: 28px; height: 28px;
+    background: linear-gradient(135deg, #1b8fe3, #00b4d8);
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700; color: #fff;
+    letter-spacing: -0.5px;
+  }
+
+  .logo-text {
+    font-size: 14px; font-weight: 600;
+    color: #e0e4ec;
+    letter-spacing: 0.2px;
+  }
+
+  .logo-text span { color: var(--accent-blue); }
+
+  .header-sep { width: 1px; height: 24px; background: var(--border); margin: 0 4px; }
+
+  .header-tabs {
+    display: flex;
+    gap: 2px;
+  }
+
+  .header-tab {
+    padding: 5px 14px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all .15s;
+    letter-spacing: 0.2px;
+  }
+
+  .header-tab:hover { background: var(--bg-hover); color: var(--text-primary); }
+  .header-tab.active { background: var(--bg-active); color: #fff; }
+
+  .header-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .header-btn {
+    padding: 5px 12px;
+    font-size: 12px;
+    font-family: var(--font);
+    color: var(--text-secondary);
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all .15s;
+    display: flex; align-items: center; gap: 5px;
+  }
+
+  .header-btn:hover { background: var(--bg-hover); color: var(--text-primary); border-color: #4a5260; }
+  .header-btn.primary { background: var(--accent-blue); border-color: var(--accent-blue); color: #fff; }
+  .header-btn.primary:hover { background: #2199f3; }
+
+  .file-name {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    padding: 4px 10px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+  }
+
+  /* ── MAIN LAYOUT ── */
+  .app-body {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+  }
+
+  /* ── LEFT PANEL ── */
+  .left-panel {
+    width: var(--panel-width);
+    background: var(--bg-panel);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+
+  .panel-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-toolbar);
+  }
+
+  .panel-tab {
+    flex: 1;
+    padding: 9px 6px;
+    font-size: 10px;
+    font-weight: 600;
+    text-align: center;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all .15s;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    border-bottom: 2px solid transparent;
+  }
+
+  .panel-tab:hover { color: var(--text-secondary); }
+  .panel-tab.active { color: var(--accent-blue); border-bottom-color: var(--accent-blue); }
+
+  .panel-content { flex: 1; overflow-y: auto; overflow-x: hidden; }
+  .panel-content::-webkit-scrollbar { width: 4px; }
+  .panel-content::-webkit-scrollbar-track { background: transparent; }
+  .panel-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .panel-section {
+    border-bottom: 1px solid var(--border-light);
+  }
+
+  .panel-section-header {
+    padding: 8px 12px;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-muted);
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    background: var(--bg-secondary);
+  }
+
+  .panel-section-header:hover { color: var(--text-secondary); }
+
+  .chevron {
+    font-size: 9px;
+    transition: transform .2s;
+  }
+
+  .collapsed .chevron { transform: rotate(-90deg); }
+  .collapsed .section-body { display: none; }
+
+  /* LAYER TREE */
+  .layer-item {
+    display: flex;
+    align-items: center;
+    padding: 5px 12px;
+    gap: 6px;
+    cursor: pointer;
+    transition: background .1s;
+    font-size: 12px;
+  }
+
+  .layer-item:hover { background: var(--bg-hover); }
+
+  .layer-eye {
+    width: 14px; height: 14px;
+    color: var(--text-secondary);
+    font-size: 11px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+
+  .layer-eye.hidden { color: var(--text-muted); }
+
+  .layer-color {
+    width: 10px; height: 10px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  .layer-name {
+    font-size: 11.5px;
+    color: var(--text-primary);
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .layer-name.hidden { color: var(--text-muted); text-decoration: line-through; }
+
+  /* MODEL TREE */
+  .tree-item {
+    display: flex;
+    align-items: center;
+    padding: 4px 12px;
+    gap: 5px;
+    cursor: pointer;
+    font-size: 11.5px;
+    color: var(--text-primary);
+    transition: background .1s;
+  }
+
+  .tree-item:hover { background: var(--bg-hover); }
+  .tree-item.selected { background: rgba(27,143,227,.18); color: var(--accent-blue); }
+
+  .tree-item .indent { flex-shrink: 0; }
+
+  .tree-arrow {
+    width: 12px; height: 12px;
+    font-size: 9px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-muted);
+    flex-shrink: 0;
+  }
+
+  .tree-icon {
+    width: 14px; height: 14px;
+    font-size: 11px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+
+  /* SEARCH */
+  .search-box {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .search-input {
+    width: 100%;
+    padding: 6px 10px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 11.5px;
+    font-family: var(--font);
+    color: var(--text-primary);
+    outline: none;
+    transition: border-color .15s;
+  }
+
+  .search-input:focus { border-color: var(--accent-blue); }
+  .search-input::placeholder { color: var(--text-muted); }
+
+  /* PROPERTIES */
+  .prop-row {
+    display: flex;
+    align-items: flex-start;
+    padding: 5px 12px;
+    gap: 8px;
+    border-bottom: 1px solid rgba(54,59,68,.4);
+  }
+
+  .prop-key {
+    font-size: 10.5px;
+    color: var(--text-muted);
+    width: 90px;
+    flex-shrink: 0;
+    padding-top: 1px;
+    font-family: var(--font-mono);
+  }
+
+  .prop-val {
+    font-size: 11px;
+    color: var(--text-primary);
+    flex: 1;
+    word-break: break-all;
+  }
+
+  /* ── VIEWPORT AREA ── */
+  .viewport-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* ── TOOLBAR ── */
+  .toolbar {
+    height: var(--toolbar-h);
+    background: var(--bg-toolbar);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    gap: 2px;
+    flex-shrink: 0;
+  }
+
+  .toolbar-sep { width: 1px; height: 24px; background: var(--border); margin: 0 4px; }
+
+  .tool-btn {
+    width: 32px; height: 32px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    color: var(--text-secondary);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all .15s;
+    position: relative;
+  }
+
+  .tool-btn:hover { background: var(--bg-hover); color: var(--text-primary); border-color: var(--border); }
+  .tool-btn.active { background: rgba(27,143,227,.2); color: var(--accent-blue); border-color: rgba(27,143,227,.4); }
+
+  .tool-btn .tooltip {
+    position: absolute;
+    bottom: -30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #0d0f12;
+    border: 1px solid var(--border);
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    color: var(--text-primary);
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .15s;
+    z-index: 999;
+  }
+
+  .tool-btn:hover .tooltip { opacity: 1; }
+
+  .tool-label {
+    padding: 0 8px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    display: flex; align-items: center; gap: 5px;
+  }
+
+  /* ZOOM */
+  .zoom-control {
+    display: flex; align-items: center; gap: 4px;
+    margin-left: auto;
+  }
+
+  .zoom-val {
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: var(--text-secondary);
+    min-width: 44px;
+    text-align: center;
+    padding: 4px 6px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  /* ── CANVAS ── */
+  .canvas-area {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background: #0d0f12;
+    cursor: crosshair;
+  }
+
+  canvas#viewer {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+  }
+
+  /* ── VIEW CUBE ── */
+  .view-cube {
+    position: absolute;
+    top: 16px; right: 16px;
+    width: 70px; height: 70px;
+    cursor: pointer;
+  }
+
+  .cube-face {
+    position: absolute;
+    width: 38px; height: 38px;
+    background: rgba(30,33,38,.85);
+    border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    letter-spacing: 0.5px;
+    transition: all .15s;
+  }
+
+  .cube-face:hover { background: rgba(27,143,227,.3); color: #fff; border-color: var(--accent-blue); }
+  .cube-top { top: 0; left: 16px; transform: perspective(60px) rotateX(40deg); }
+  .cube-front { top: 28px; left: 0; }
+  .cube-side { top: 28px; left: 32px; }
+
+  /* ── MINI MAP ── */
+  .mini-map {
+    position: absolute;
+    bottom: 56px; right: 16px;
+    width: 120px; height: 90px;
+    background: rgba(21,24,29,.9);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .mini-map canvas { width: 100%; height: 100%; }
+
+  .mini-map-label {
+    position: absolute;
+    top: 4px; left: 6px;
+    font-size: 9px;
+    color: var(--text-muted);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    font-family: var(--font-mono);
+  }
+
+  /* ── STATUS BAR ── */
+  .status-bar {
+    height: 26px;
+    background: #141619;
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    gap: 16px;
+    flex-shrink: 0;
+  }
+
+  .status-item {
+    font-size: 10px;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+    display: flex; align-items: center; gap: 5px;
+  }
+
+  .status-item span { color: var(--text-secondary); }
+
+  .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent-green);
+    box-shadow: 0 0 4px var(--accent-green);
+  }
+
+  /* ── RIGHT PANEL ── */
+  .right-panel {
+    width: 240px;
+    background: var(--bg-panel);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+  }
+
+  .rpanel-header {
+    padding: 10px 12px;
+    background: var(--bg-toolbar);
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: 0.3px;
+    display: flex; align-items: center; gap: 6px;
+  }
+
+  .clash-badge {
+    margin-left: auto;
+    padding: 1px 7px;
+    background: rgba(224,80,80,.2);
+    border: 1px solid rgba(224,80,80,.4);
+    border-radius: 10px;
+    font-size: 10px;
+    color: var(--accent-red);
+    font-weight: 600;
+  }
+
+  .rpanel-content { flex: 1; overflow-y: auto; }
+  .rpanel-content::-webkit-scrollbar { width: 4px; }
+  .rpanel-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* CLASH LIST */
+  .clash-item {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-light);
+    cursor: pointer;
+    transition: background .12s;
+  }
+
+  .clash-item:hover { background: var(--bg-hover); }
+  .clash-item.selected { background: rgba(224,80,80,.1); border-left: 2px solid var(--accent-red); padding-left: 10px; }
+
+  .clash-id {
+    font-size: 10px;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+    margin-bottom: 2px;
+  }
+
+  .clash-desc {
+    font-size: 11.5px;
+    color: var(--text-primary);
+    margin-bottom: 3px;
+  }
+
+  .clash-meta {
+    display: flex; gap: 6px; align-items: center;
+  }
+
+  .clash-tag {
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+  }
+
+  .tag-hard { background: rgba(224,80,80,.2); color: var(--accent-red); }
+  .tag-soft { background: rgba(240,128,64,.2); color: var(--accent-orange); }
+  .tag-dup { background: rgba(224,176,64,.2); color: var(--accent-yellow); }
+
+  /* MEASUREMENT RESULT */
+  .measure-panel {
+    padding: 10px 12px;
+  }
+
+  .measure-row {
+    display: flex; justify-content: space-between;
+    padding: 5px 0;
+    border-bottom: 1px solid rgba(54,59,68,.4);
+  }
+
+  .measure-label { font-size: 11px; color: var(--text-muted); }
+  .measure-value { font-size: 11px; color: var(--accent-cyan); font-family: var(--font-mono); }
+
+  /* ── SECTION PLANES WIDGET ── */
+  .section-widget {
+    padding: 10px 12px;
+  }
+
+  .axis-slider {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .axis-label {
+    font-size: 11px;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    width: 14px;
+  }
+
+  .axis-label.x { color: var(--accent-red); }
+  .axis-label.y { color: var(--accent-green); }
+  .axis-label.z { color: var(--accent-blue); }
+
+  input[type=range] {
+    -webkit-appearance: none;
+    flex: 1;
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--accent-blue);
+    cursor: pointer;
+    border: 2px solid var(--bg-panel);
+  }
+
+  .axis-val {
+    font-size: 10px;
+    font-family: var(--font-mono);
+    color: var(--text-secondary);
+    width: 34px;
+    text-align: right;
+  }
+
+  /* ── NOTIFICATION ── */
+  .toast {
+    position: fixed;
+    bottom: 40px; left: 50%;
+    transform: translateX(-50%) translateY(60px);
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-size: 12px;
+    color: var(--text-primary);
+    display: flex; align-items: center; gap: 8px;
+    z-index: 9999;
+    transition: transform .25s cubic-bezier(.34,1.56,.64,1);
+    box-shadow: 0 8px 32px rgba(0,0,0,.5);
+    pointer-events: none;
+  }
+
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* ── LOADING OVERLAY ── */
+  .loading-overlay {
+    position: fixed; inset: 0;
+    background: rgba(13,15,18,.92);
+    z-index: 9000;
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 16px;
+    transition: opacity .4s;
+  }
+
+  .loading-overlay.hidden { opacity: 0; pointer-events: none; }
+
+  .loader-bar {
+    width: 300px; height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .loader-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-blue), var(--accent-cyan));
+    border-radius: 2px;
+    width: 0%;
+    transition: width .3s ease;
+    animation: load 2.5s ease forwards;
+  }
+
+  @keyframes load {
+    0% { width: 0%; }
+    40% { width: 55%; }
+    70% { width: 78%; }
+    90% { width: 92%; }
+    100% { width: 100%; }
+  }
+
+  .loader-text {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    letter-spacing: 0.3px;
+  }
+
+  .loader-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  /* ── FILE DROP ZONE ── */
+  .drop-zone {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 12px;
+    z-index: 10;
+  }
+
+  .drop-zone.hidden { display: none; }
+
+  .drop-icon {
+    width: 64px; height: 64px;
+    background: rgba(27,143,227,.12);
+    border: 1.5px dashed rgba(27,143,227,.4);
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px;
+    margin-bottom: 4px;
+  }
+
+  .drop-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .drop-sub {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .drop-formats {
+    display: flex; gap: 8px; margin-top: 4px;
+  }
+
+  .fmt-chip {
+    padding: 3px 10px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: var(--text-secondary);
+    background: var(--bg-panel);
+  }
+
+  .fmt-chip.dwg { border-color: rgba(0,180,216,.4); color: var(--accent-cyan); }
+  .fmt-chip.nwd { border-color: rgba(61,220,132,.4); color: var(--accent-green); }
+  .fmt-chip.nwc { border-color: rgba(240,128,64,.4); color: var(--accent-orange); }
+
+  /* ── MISC ── */
+  .badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 16px; height: 16px;
+    padding: 0 4px;
+    background: var(--accent-red);
+    border-radius: 8px;
+    font-size: 9px;
+    font-weight: 700;
+    color: #fff;
+    margin-left: auto;
+  }
+
+  .coord-display {
+    display: flex; gap: 10px;
+    margin-right: 8px;
+  }
+
+  .coord-item {
+    font-size: 10px;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+  }
+
+  .coord-item span { color: var(--text-secondary); }
+
+  /* CONTEXT MENU */
+  .ctx-menu {
+    position: fixed;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    min-width: 160px;
+    z-index: 9999;
+    box-shadow: 0 8px 32px rgba(0,0,0,.5);
+    padding: 4px 0;
+    display: none;
+  }
+
+  .ctx-menu.show { display: block; }
+
+  .ctx-item {
+    padding: 7px 14px;
+    font-size: 12px;
+    color: var(--text-primary);
+    cursor: pointer;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  .ctx-item:hover { background: var(--bg-hover); }
+  .ctx-item .icon { font-size: 13px; width: 16px; }
+  .ctx-sep { height: 1px; background: var(--border); margin: 3px 0; }
+
+  .mode-3d-only { display: none; }
+
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="drop-icon" style="margin-bottom:0">📐</div>
+  <div class="loader-title">SyncDrawing Viewer</div>
+  <div class="loader-bar"><div class="loader-fill" id="loaderFill"></div></div>
+  <div class="loader-text" id="loaderText">Initializing WebGL renderer...</div>
+</div>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">SD</div>
+    <div class="logo-text">Sync<span>Drawing</span></div>
+  </div>
+  <div class="header-sep"></div>
+  <div class="header-tabs">
+    <div class="header-tab active" onclick="setMode('dwg',this)">DWG</div>
+    <div class="header-tab" onclick="setMode('nwd',this)">NWD / NWC</div>
+  </div>
+  <div class="header-sep"></div>
+  <div class="file-name" id="fileNameDisplay">No file loaded</div>
+  <div class="header-right">
+    <button class="header-btn" onclick="showToast('📤 Export options coming soon')">⬆ Export</button>
+    <button class="header-btn" onclick="showToast('🔗 Sharing link copied!')">🔗 Share</button>
+    <button class="header-btn primary" onclick="triggerFileOpen()">📂 Open File</button>
+    <input type="file" id="fileInput" accept=".dwg,.nwd,.nwc" style="display:none" onchange="handleFileLoad(this)"/>
+  </div>
+</header>
+
+<!-- BODY -->
+<div class="app-body">
+
+  <!-- LEFT PANEL -->
+  <div class="left-panel" id="leftPanel">
+    <div class="panel-tabs">
+      <div class="panel-tab active" onclick="switchTab('layers',this)">Layers</div>
+      <div class="panel-tab" onclick="switchTab('model',this)">Model</div>
+      <div class="panel-tab" onclick="switchTab('props',this)">Props</div>
+    </div>
+
+    <!-- LAYERS TAB -->
+    <div class="panel-content" id="tab-layers">
+      <div class="search-box">
+        <input class="search-input" type="text" placeholder="Search layers..." oninput="filterLayers(this.value)"/>
+      </div>
+      <div class="panel-section">
+        <div class="panel-section-header" onclick="toggleSection(this.parentNode)">
+          <span>Drawing Layers</span>
+          <span class="chevron">▾</span>
+        </div>
+        <div class="section-body" id="layerList"></div>
+      </div>
+    </div>
+
+    <!-- MODEL TAB -->
+    <div class="panel-content" id="tab-model" style="display:none">
+      <div class="search-box">
+        <input class="search-input" type="text" placeholder="Search objects..."/>
+      </div>
+      <div id="modelTree"></div>
+    </div>
+
+    <!-- PROPERTIES TAB -->
+    <div class="panel-content" id="tab-props" style="display:none">
+      <div class="panel-section">
+        <div class="panel-section-header" onclick="toggleSection(this.parentNode)">
+          <span>File Properties</span>
+          <span class="chevron">▾</span>
+        </div>
+        <div class="section-body" id="fileProps"></div>
+      </div>
+      <div class="panel-section">
+        <div class="panel-section-header" onclick="toggleSection(this.parentNode)">
+          <span>Object Properties</span>
+          <span class="chevron">▾</span>
+        </div>
+        <div class="section-body" id="objProps">
+          <div style="padding:12px;font-size:11px;color:var(--text-muted)">Select an object to view properties</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VIEWPORT -->
+  <div class="viewport-wrapper">
+    <!-- TOOLBAR -->
+    <div class="toolbar">
+      <!-- Navigation group -->
+      <div class="tool-label" style="font-size:10px;color:var(--text-muted);letter-spacing:.5px;text-transform:uppercase;margin-right:2px">NAV</div>
+      <button class="tool-btn active" id="btnSelect" onclick="setTool('select',this)" title="">
+        ↖<span class="tooltip">Select</span>
+      </button>
+      <button class="tool-btn" id="btnPan" onclick="setTool('pan',this)">
+        ✋<span class="tooltip">Pan</span>
+      </button>
+      <button class="tool-btn" id="btnOrbit" onclick="setTool('orbit',this)">
+        🔄<span class="tooltip">Orbit (3D)</span>
+      </button>
+      <button class="tool-btn" onclick="fitToScreen()">
+        ⊡<span class="tooltip">Fit to Screen</span>
+      </button>
+      <button class="tool-btn" onclick="prevView()">◁<span class="tooltip">Previous View</span></button>
+      <button class="tool-btn" onclick="nextView()">▷<span class="tooltip">Next View</span></button>
+      <div class="toolbar-sep"></div>
+
+      <!-- Measure group -->
+      <div class="tool-label" style="font-size:10px;color:var(--text-muted);letter-spacing:.5px;text-transform:uppercase;margin-right:2px">MEASURE</div>
+      <button class="tool-btn" onclick="setTool('measure-linear',this)">📏<span class="tooltip">Linear Measure</span></button>
+      <button class="tool-btn" onclick="setTool('measure-area',this)">⬜<span class="tooltip">Area Measure</span></button>
+      <button class="tool-btn" onclick="setTool('measure-angle',this)">📐<span class="tooltip">Angle Measure</span></button>
+      <button class="tool-btn" onclick="setTool('measure-radius',this)">◎<span class="tooltip">Radius</span></button>
+      <div class="toolbar-sep"></div>
+
+      <!-- View group -->
+      <div class="tool-label" style="font-size:10px;color:var(--text-muted);letter-spacing:.5px;text-transform:uppercase;margin-right:2px">VIEW</div>
+      <button class="tool-btn" onclick="toggleSection3D('section')">✂<span class="tooltip">Section Planes</span></button>
+      <button class="tool-btn" onclick="showToast('🌐 Walk mode activated')">🚶<span class="tooltip">Walk Mode</span></button>
+      <button class="tool-btn" onclick="showToast('✈ Fly mode activated')">✈<span class="tooltip">Fly Mode</span></button>
+      <button class="tool-btn" onclick="toggleGrid()">⊞<span class="tooltip">Toggle Grid</span></button>
+      <div class="toolbar-sep"></div>
+
+      <!-- Layout selector (DWG) -->
+      <div class="tool-label" id="layoutLabel" style="font-size:10px;color:var(--text-muted)">Layout:</div>
+      <div id="layoutSelector" style="display:flex;gap:2px">
+        <button class="tool-btn active" style="width:auto;padding:0 8px;font-size:10px" onclick="switchLayout('Model',this)">Model</button>
+        <button class="tool-btn" style="width:auto;padding:0 8px;font-size:10px" onclick="switchLayout('Sheet 1',this)">Sheet 1</button>
+        <button class="tool-btn" style="width:auto;padding:0 8px;font-size:10px" onclick="switchLayout('Sheet 2',this)">Sheet 2</button>
+      </div>
+
+      <!-- Zoom -->
+      <div class="zoom-control">
+        <button class="tool-btn" onclick="adjustZoom(-10)">−</button>
+        <div class="zoom-val" id="zoomVal" onclick="resetZoom()">100%</div>
+        <button class="tool-btn" onclick="adjustZoom(10)">+</button>
+      </div>
+    </div>
+
+    <!-- CANVAS -->
+    <div class="canvas-area" id="canvasArea"
+         onmousedown="onMouseDown(event)"
+         onmousemove="onMouseMove(event)"
+         onmouseup="onMouseUp(event)"
+         onwheel="onWheel(event)"
+         oncontextmenu="showContextMenu(event)">
+
+      <canvas id="viewer"></canvas>
+
+      <!-- DROP ZONE (shown when no file) -->
+      <div class="drop-zone" id="dropZone">
+        <div class="drop-icon">📂</div>
+        <div class="drop-title">Open Engineering File</div>
+        <div class="drop-sub">Drag & drop or click Open File above</div>
+        <div class="drop-formats">
+          <span class="fmt-chip dwg">DWG</span>
+          <span class="fmt-chip nwd">NWD</span>
+          <span class="fmt-chip nwc">NWC</span>
+        </div>
+      </div>
+
+      <!-- VIEW CUBE -->
+      <div class="view-cube" id="viewCube">
+        <div class="cube-face cube-top" onclick="setViewAngle('top')">TOP</div>
+        <div class="cube-face cube-front" onclick="setViewAngle('front')">FRONT</div>
+        <div class="cube-face cube-side" onclick="setViewAngle('side')">SIDE</div>
+      </div>
+
+      <!-- MINI MAP -->
+      <div class="mini-map" id="miniMap">
+        <div class="mini-map-label">OVERVIEW</div>
+        <canvas id="miniCanvas" width="120" height="90"></canvas>
+      </div>
+    </div>
+
+    <!-- STATUS BAR -->
+    <div class="status-bar">
+      <div class="status-item"><div class="status-dot"></div><span id="statusText">Ready</span></div>
+      <div class="status-item">Mode: <span id="modeDisplay">DWG Viewer</span></div>
+      <div class="status-item">Tool: <span id="toolDisplay">Select</span></div>
+      <div class="coord-display">
+        <div class="coord-item">X: <span id="coordX">0.00</span></div>
+        <div class="coord-item">Y: <span id="coordY">0.00</span></div>
+        <div class="coord-item">Z: <span id="coordZ">–</span></div>
+      </div>
+      <div class="status-item" style="margin-left:auto">FPS: <span id="fpsDisplay">60</span></div>
+      <div class="status-item">Scale: <span id="scaleDisplay">1:100</span></div>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="right-panel">
+    <!-- CLASH VIEW -->
+    <div class="rpanel-header" id="rpanelTitle">
+      ⚠ Clash Detection
+      <span class="clash-badge" id="clashBadge">12</span>
+    </div>
+    <div class="rpanel-content" id="rightPanelContent"></div>
+  </div>
+</div>
+
+<!-- CONTEXT MENU -->
+<div class="ctx-menu" id="ctxMenu">
+  <div class="ctx-item" onclick="ctxAction('isolate')"><span class="icon">🔍</span>Isolate</div>
+  <div class="ctx-item" onclick="ctxAction('hide')"><span class="icon">👁</span>Hide</div>
+  <div class="ctx-item" onclick="ctxAction('color')"><span class="icon">🎨</span>Override Color</div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item" onclick="ctxAction('measure')"><span class="icon">📏</span>Measure from here</div>
+  <div class="ctx-item" onclick="ctxAction('properties')"><span class="icon">ℹ</span>Properties</div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item" onclick="ctxAction('copy-coords')"><span class="icon">📋</span>Copy Coordinates</div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+/* ===================== STATE ===================== */
+let state = {
+  mode: 'dwg',       // 'dwg' | 'nwd'
+  tool: 'select',
+  zoom: 100,
+  pan: { x: 0, y: 0 },
+  dragging: false,
+  lastMouse: { x: 0, y: 0 },
+  grid: true,
+  fileLoaded: false,
+  currentLayout: 'Model',
+  viewAngle: 'front',
+  mousePos: { x: 0, y: 0 },
+  viewHistory: [],
+  viewFuture: [],
+  measurePoints: [],
+  activeMeasure: null,
+  frame: 0,
+  fps: 60,
+  lastTime: performance.now()
+};
+
+const layers = [
+  { name: '0', color: '#ffffff', visible: true },
+  { name: 'A-WALL', color: '#e05050', visible: true },
+  { name: 'A-DOOR', color: '#f08040', visible: true },
+  { name: 'A-WINDOW', color: '#e0b040', visible: true },
+  { name: 'S-BEAM', color: '#3ddc84', visible: true },
+  { name: 'S-COLUMN', color: '#00b4d8', visible: true },
+  { name: 'M-HVAC', color: '#1b8fe3', visible: true },
+  { name: 'E-POWER', color: '#a078e8', visible: true },
+  { name: 'P-PIPE', color: '#e060a0', visible: true },
+  { name: 'GRID', color: '#565d6e', visible: true },
+  { name: 'DIMS', color: '#8a909c', visible: true },
+  { name: 'TEXT', color: '#d4d8e0', visible: true },
+];
+
+const modelTree = [
+  { id: 1, name: 'Site Model', icon: '🏗', indent: 0, open: true, children: [2,3,4] },
+  { id: 2, name: 'Level 01', icon: '📐', indent: 1, open: true, children: [5,6] },
+  { id: 5, name: 'Structural', icon: '🔩', indent: 2, open: false, children: [] },
+  { id: 6, name: 'Architecture', icon: '🏛', indent: 2, open: false, children: [] },
+  { id: 3, name: 'Level 02', icon: '📐', indent: 1, open: false, children: [] },
+  { id: 4, name: 'MEP', icon: '⚡', indent: 1, open: true, children: [7,8] },
+  { id: 7, name: 'HVAC Ducts', icon: '🌀', indent: 2, open: false, children: [] },
+  { id: 8, name: 'Pipework', icon: '🔧', indent: 2, open: false, children: [] },
+];
+
+const clashes = [
+  { id: 'CLH-001', desc: 'HVAC Duct vs Structural Beam', type: 'hard', dist: '−12mm' },
+  { id: 'CLH-002', desc: 'Pipe Clash with Column', type: 'hard', dist: '−5mm' },
+  { id: 'CLS-003', desc: 'Cable Tray Clearance', type: 'soft', dist: '+18mm' },
+  { id: 'CLS-004', desc: 'Duct to Duct Clearance', type: 'soft', dist: '+8mm' },
+  { id: 'CLD-005', desc: 'Duplicate Pipe Segment', type: 'dup', dist: '0mm' },
+  { id: 'CLH-006', desc: 'Sprinkler vs Beam Flange', type: 'hard', dist: '−3mm' },
+  { id: 'CLS-007', desc: 'HVAC Fan Clearance', type: 'soft', dist: '+25mm' },
+  { id: 'CLH-008', desc: 'Conduit through Slab', type: 'hard', dist: '−20mm' },
+  { id: 'CLS-009', desc: 'Pipe Hanger Clearance', type: 'soft', dist: '+10mm' },
+  { id: 'CLH-010', desc: 'Structural Connection Clash', type: 'hard', dist: '−7mm' },
+  { id: 'CLD-011', desc: 'Duplicate Wall Element', type: 'dup', dist: '0mm' },
+  { id: 'CLH-012', desc: 'Foundation vs Utility Pipe', type: 'hard', dist: '−35mm' },
+];
+
+/* ===================== INIT ===================== */
+window.addEventListener('load', () => {
+  // Simulate loading sequence
+  const messages = [
+    'Initializing WebGL renderer...',
+    'Loading geometry engine...',
+    'Building shader programs...',
+    'Setting up layer system...',
+    'Ready'
+  ];
+  let i = 0;
+  const lt = document.getElementById('loaderText');
+  const interval = setInterval(() => {
+    if (i < messages.length) lt.textContent = messages[i++];
+    else clearInterval(interval);
+  }, 480);
+
+  setTimeout(() => {
+    document.getElementById('loadingOverlay').classList.add('hidden');
+    initUI();
+    resizeCanvas();
+    renderLoop();
+  }, 2600);
+
+  window.addEventListener('resize', resizeCanvas);
+  document.addEventListener('click', () => document.getElementById('ctxMenu').classList.remove('show'));
+});
+
+function initUI() {
+  buildLayers();
+  buildModelTree();
+  buildProperties();
+  buildClashPanel();
+  buildSectionPanel();
+}
+
+/* ===================== CANVAS ===================== */
+function resizeCanvas() {
+  const ca = document.getElementById('canvasArea');
+  const cv = document.getElementById('viewer');
+  cv.width = ca.clientWidth;
+  cv.height = ca.clientHeight;
+}
+
+let _raf;
+function renderLoop() {
+  const now = performance.now();
+  const dt = now - state.lastTime;
+  state.lastTime = now;
+  state.fps = Math.round(1000 / dt);
+  document.getElementById('fpsDisplay').textContent = Math.min(60, state.fps);
+
+  draw();
+  _raf = requestAnimationFrame(renderLoop);
+}
+
+function draw() {
+  const cv = document.getElementById('viewer');
+  const ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height;
+  if (!W || !H) return;
+
+  ctx.clearRect(0, 0, W, H);
+
+  if (!state.fileLoaded) {
+    drawBackground(ctx, W, H);
+    return;
+  }
+
+  ctx.save();
+  ctx.translate(state.pan.x + W/2, state.pan.y + H/2);
+  ctx.scale(state.zoom/100, state.zoom/100);
+
+  drawBackground(ctx, W, H);
+
+  if (state.mode === 'dwg') {
+    drawDWG(ctx, W, H);
+  } else {
+    draw3DModel(ctx, W, H);
+  }
+
+  ctx.restore();
+
+  drawMeasureOverlay(ctx, W, H);
+  drawMiniMap();
+  state.frame++;
+}
+
+function drawBackground(ctx, W, H) {
+  // dark grid background
+  if (!state.fileLoaded) {
+    ctx.fillStyle = '#0d0f12';
+    ctx.fillRect(0, 0, W, H);
+  }
+  if (state.grid) {
+    const gridSize = 40 * (state.zoom/100);
+    const ox = (state.pan.x + W/2) % gridSize;
+    const oy = (state.pan.y + H/2) % gridSize;
+    ctx.strokeStyle = 'rgba(50,55,65,0.6)';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    for (let x = ox - gridSize; x < W + gridSize; x += gridSize) {
+      ctx.moveTo(x, 0); ctx.lineTo(x, H);
+    }
+    for (let y = oy - gridSize; y < H + gridSize; y += gridSize) {
+      ctx.moveTo(0, y); ctx.lineTo(W, y);
+    }
+    ctx.stroke();
+
+    // Major grid
+    const maj = gridSize * 5;
+    const mox = (state.pan.x + W/2) % maj;
+    const moy = (state.pan.y + H/2) % maj;
+    ctx.strokeStyle = 'rgba(60,66,80,0.5)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let x = mox - maj; x < W + maj; x += maj) {
+      ctx.moveTo(x, 0); ctx.lineTo(x, H);
+    }
+    for (let y = moy - maj; y < H + maj; y += maj) {
+      ctx.moveTo(0, y); ctx.lineTo(W, y);
+    }
+    ctx.stroke();
+  }
+}
+
+function drawDWG(ctx, W, H) {
+  const t = state.frame * 0.002;
+  const vis = {};
+  layers.forEach(l => vis[l.name] = l.visible);
+
+  // Building outline
+  if (vis['A-WALL']) {
+    ctx.strokeStyle = '#e05050';
+    ctx.lineWidth = 2.5 / (state.zoom/100);
+    ctx.beginPath();
+    const walls = [[-320,-200,320,-200],[320,-200,320,200],
+                   [320,200,-320,200],[-320,200,-320,-200],
+                   [-80,-200,-80,50],[80,-200,80,50],
+                   [-320,-50,80,-50],[-320,80,80,80]];
+    walls.forEach(([x1,y1,x2,y2]) => {
+      ctx.moveTo(x1,y1); ctx.lineTo(x2,y2);
+    });
+    ctx.stroke();
+
+    // Inner rooms
+    ctx.beginPath();
+    ctx.rect(-280,-160,160,100);
+    ctx.rect(-280,20,160,140);
+    ctx.rect(50,-160,230,100);
+    ctx.rect(50,20,230,140);
+    ctx.stroke();
+  }
+
+  // Doors
+  if (vis['A-DOOR']) {
+    ctx.strokeStyle = '#f08040';
+    ctx.lineWidth = 1.5 / (state.zoom/100);
+    [[-80,-50,40,0],[80,-50,40,0],[-80,80,40,0]].forEach(([x,y,r,a]) => {
+      ctx.save();
+      ctx.translate(x,y);
+      ctx.beginPath();
+      ctx.moveTo(0,0); ctx.lineTo(r,0);
+      ctx.arc(0,0,r,0,Math.PI/2);
+      ctx.stroke();
+      ctx.restore();
+    });
+  }
+
+  // Windows
+  if (vis['A-WINDOW']) {
+    ctx.strokeStyle = '#e0b040';
+    ctx.lineWidth = 1.5 / (state.zoom/100);
+    [[-200,-200,60,0],[-60,-200,60,0],[150,-200,80,0],
+     [-320,-120,0,60],[-320,0,0,60],[320,-120,0,60]].forEach(([x,y,w,h]) => {
+      ctx.beginPath();
+      ctx.rect(x - w/2, y - h/2, w || 6, h || 6);
+      ctx.stroke();
+    });
+  }
+
+  // Structural
+  if (vis['S-COLUMN']) {
+    ctx.fillStyle = 'rgba(61,220,132,0.6)';
+    ctx.strokeStyle = '#3ddc84';
+    ctx.lineWidth = 1.5 / (state.zoom/100);
+    [[-320,-200],[0,-200],[320,-200],[-320,0],[0,0],[320,0],[-320,200],[0,200],[320,200]].forEach(([x,y]) => {
+      ctx.beginPath(); ctx.rect(x-10,y-10,20,20); ctx.fill(); ctx.stroke();
+    });
+  }
+
+  if (vis['S-BEAM']) {
+    ctx.strokeStyle = '#3ddc84';
+    ctx.lineWidth = 1 / (state.zoom/100);
+    ctx.setLineDash([8,4]);
+    for (let x = -320; x <= 320; x += 160) {
+      ctx.beginPath(); ctx.moveTo(x,-200); ctx.lineTo(x,200); ctx.stroke();
+    }
+    for (let y = -200; y <= 200; y += 100) {
+      ctx.beginPath(); ctx.moveTo(-320,y); ctx.lineTo(320,y); ctx.stroke();
+    }
+    ctx.setLineDash([]);
+  }
+
+  // MEP
+  if (vis['M-HVAC']) {
+    ctx.strokeStyle = 'rgba(27,143,227,0.7)';
+    ctx.lineWidth = 4 / (state.zoom/100);
+    ctx.beginPath();
+    ctx.moveTo(-280, -130); ctx.lineTo(280, -130);
+    ctx.moveTo(0, -130); ctx.lineTo(0, 130);
+    ctx.moveTo(-280, 130); ctx.lineTo(280, 130);
+    ctx.stroke();
+  }
+
+  if (vis['P-PIPE']) {
+    ctx.strokeStyle = 'rgba(224,96,160,0.7)';
+    ctx.lineWidth = 2 / (state.zoom/100);
+    ctx.beginPath();
+    ctx.moveTo(-260, -160); ctx.lineTo(-260, 160);
+    ctx.moveTo(260, -160); ctx.lineTo(260, 160);
+    ctx.moveTo(-260, 0); ctx.lineTo(260, 0);
+    ctx.stroke();
+  }
+
+  // Grid lines
+  if (vis['GRID']) {
+    ctx.strokeStyle = 'rgba(100,110,130,0.5)';
+    ctx.lineWidth = 0.5 / (state.zoom/100);
+    ctx.setLineDash([4,8]);
+    for (let x = -320; x <= 320; x += 160) {
+      ctx.beginPath(); ctx.moveTo(x,-230); ctx.lineTo(x,230); ctx.stroke();
+      ctx.fillStyle = 'rgba(140,150,170,0.8)';
+      ctx.font = `${12/(state.zoom/100)}px IBM Plex Mono`;
+      ctx.textAlign = 'center';
+      ctx.fillText(String.fromCharCode(65 + (x+320)/160), x, -245);
+    }
+    for (let y = -200; y <= 200; y += 100) {
+      ctx.beginPath(); ctx.moveTo(-350,y); ctx.lineTo(350,y); ctx.stroke();
+      ctx.font = `${12/(state.zoom/100)}px IBM Plex Mono`;
+      ctx.textAlign = 'right';
+      ctx.fillText(((-y+200)/100+1).toString(), -360, y+4);
+    }
+    ctx.setLineDash([]);
+  }
+
+  // Dimensions
+  if (vis['DIMS']) {
+    ctx.strokeStyle = 'rgba(138,144,156,0.7)';
+    ctx.fillStyle = 'rgba(138,144,156,0.9)';
+    ctx.lineWidth = 0.7 / (state.zoom/100);
+    ctx.font = `${10/(state.zoom/100)}px IBM Plex Mono`;
+    ctx.textAlign = 'center';
+
+    // Top dim
+    ctx.beginPath(); ctx.moveTo(-320,-220); ctx.lineTo(320,-220); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-320,-220); ctx.lineTo(-320,-200); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(320,-220); ctx.lineTo(320,-200); ctx.stroke();
+    ctx.fillText('64.00 m', 0, -225);
+
+    // Side dim
+    ctx.beginPath(); ctx.moveTo(340,-200); ctx.lineTo(340,200); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(340,-200); ctx.lineTo(320,-200); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(340,200); ctx.lineTo(320,200); ctx.stroke();
+    ctx.save(); ctx.translate(350,0); ctx.rotate(-Math.PI/2); ctx.fillText('40.00 m',0,0); ctx.restore();
+  }
+
+  // Text labels
+  if (vis['TEXT']) {
+    ctx.fillStyle = 'rgba(212,216,224,0.8)';
+    ctx.font = `bold ${14/(state.zoom/100)}px IBM Plex Sans`;
+    ctx.textAlign = 'center';
+    ctx.fillText('GROUND FLOOR PLAN', 0, -175);
+    ctx.font = `${10/(state.zoom/100)}px IBM Plex Mono`;
+    ctx.fillStyle = 'rgba(138,144,156,0.6)';
+    ctx.fillText('Scale 1:100   |   Rev A.3', 0, 220);
+  }
+}
+
+function draw3DModel(ctx, W, H) {
+  const t = state.frame * 0.005;
+
+  // Isometric-style 3D building wireframe
+  const iso = (x, y, z) => {
+    const angle = 0.5;
+    return {
+      sx: (x - z) * Math.cos(angle),
+      sy: (x + z) * Math.sin(angle) * 0.5 - y
+    };
+  };
+
+  const drawBox = (x0, y0, z0, x1, y1, z1, color, fill) => {
+    const corners = [
+      iso(x0,y0,z0), iso(x1,y0,z0), iso(x1,y0,z1), iso(x0,y0,z1),
+      iso(x0,y1,z0), iso(x1,y1,z0), iso(x1,y1,z1), iso(x0,y1,z1)
+    ];
+
+    const faces = [
+      [4,5,6,7], // top
+      [0,1,5,4], // front
+      [1,2,6,5], // right
+    ];
+
+    const colors = [
+      fill || 'rgba(27,143,227,0.15)',
+      'rgba(27,143,227,0.08)',
+      'rgba(27,143,227,0.05)'
+    ];
+
+    faces.forEach((f, fi) => {
+      ctx.beginPath();
+      ctx.moveTo(corners[f[0]].sx, corners[f[0]].sy);
+      f.slice(1).forEach(i => ctx.lineTo(corners[i].sx, corners[i].sy));
+      ctx.closePath();
+      ctx.fillStyle = colors[fi];
+      ctx.fill();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1 / (state.zoom/100);
+      ctx.stroke();
+    });
+  };
+
+  // Main structure
+  drawBox(-280,-240,-200,280,0,200,'rgba(27,143,227,0.6)');
+  // Level 2
+  drawBox(-240,-480,-160,240,-240,160,'rgba(61,220,132,0.4)','rgba(61,220,132,0.08)');
+  // Roof
+  drawBox(-260,-510,-180,260,-480,180,'rgba(224,176,64,0.4)','rgba(224,176,64,0.06)');
+
+  // Columns
+  [[-250,-240,-180],[-250,-240,180],[250,-240,-180],[250,-240,180],
+   [0,-240,-180],[0,-240,180]].forEach(([x,y,z]) => {
+    drawBox(x-12,y,z-12,x+12,-480,z+12,'rgba(61,220,132,0.7)','rgba(61,220,132,0.15)');
+  });
+
+  // HVAC ducts
+  ctx.strokeStyle = 'rgba(27,143,227,0.8)';
+  ctx.lineWidth = 4 / (state.zoom/100);
+  ctx.beginPath();
+  const d1 = iso(-260,-120,0), d2 = iso(260,-120,0);
+  ctx.moveTo(d1.sx, d1.sy); ctx.lineTo(d2.sx, d2.sy);
+  ctx.stroke();
+
+  // Pipes
+  ctx.strokeStyle = 'rgba(224,96,160,0.7)';
+  ctx.lineWidth = 2.5 / (state.zoom/100);
+  ctx.beginPath();
+  const p1 = iso(-230,-180,-160), p2 = iso(-230,-180,160);
+  const p3 = iso(230,-180,-160), p4 = iso(230,-180,160);
+  ctx.moveTo(p1.sx,p1.sy); ctx.lineTo(p2.sx,p2.sy);
+  ctx.moveTo(p3.sx,p3.sy); ctx.lineTo(p4.sx,p4.sy);
+  ctx.stroke();
+
+  // Clash points
+  if (state.mode === 'nwd') {
+    clashes.slice(0,4).forEach((c, i) => {
+      const px = iso(-100 + i*60, -120, -100 + i*40);
+      const rad = 8 / (state.zoom/100);
+      const pulse = 0.7 + 0.3 * Math.sin(t * 3 + i);
+      ctx.beginPath();
+      ctx.arc(px.sx, px.sy, rad * pulse, 0, Math.PI*2);
+      ctx.fillStyle = c.type === 'hard' ? 'rgba(224,80,80,0.8)' :
+                      c.type === 'soft' ? 'rgba(240,128,64,0.8)' : 'rgba(224,176,64,0.8)';
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1 / (state.zoom/100);
+      ctx.stroke();
+    });
+  }
+}
+
+function drawMeasureOverlay(ctx, W, H) {
+  if (state.measurePoints.length === 0) return;
+  ctx.save();
+
+  const toScreen = (p) => ({
+    x: p.x * (state.zoom/100) + state.pan.x + W/2,
+    y: p.y * (state.zoom/100) + state.pan.y + H/2
+  });
+
+  state.measurePoints.forEach((p, i) => {
+    const s = toScreen(p);
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, 5, 0, Math.PI*2);
+    ctx.fillStyle = '#00b4d8';
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    if (i > 0) {
+      const prev = toScreen(state.measurePoints[i-1]);
+      ctx.beginPath();
+      ctx.moveTo(prev.x, prev.y);
+      ctx.lineTo(s.x, s.y);
+      ctx.strokeStyle = '#00b4d8';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([5,3]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      const mx = (prev.x + s.x)/2, my = (prev.y + s.y)/2;
+      const dx = state.measurePoints[i].x - state.measurePoints[i-1].x;
+      const dy = state.measurePoints[i].y - state.measurePoints[i-1].y;
+      const dist = (Math.sqrt(dx*dx+dy*dy) * 0.01).toFixed(3);
+      ctx.fillStyle = 'rgba(13,15,18,0.85)';
+      ctx.fillRect(mx-28, my-12, 56, 18);
+      ctx.strokeStyle = '#00b4d8';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(mx-28, my-12, 56, 18);
+      ctx.fillStyle = '#00b4d8';
+      ctx.font = '10px IBM Plex Mono';
+      ctx.textAlign = 'center';
+      ctx.fillText(dist + 'm', mx, my+1);
+    }
+  });
+
+  // Mouse preview
+  if (state.measurePoints.length > 0 && state.tool.startsWith('measure')) {
+    const last = toScreen(state.measurePoints[state.measurePoints.length-1]);
+    ctx.beginPath();
+    ctx.moveTo(last.x, last.y);
+    ctx.lineTo(state.mousePos.x, state.mousePos.y);
+    ctx.strokeStyle = 'rgba(0,180,216,0.4)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4,4]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  ctx.restore();
+}
+
+function drawMiniMap() {
+  const mc = document.getElementById('miniCanvas');
+  const mctx = mc.getContext('2d');
+  mctx.clearRect(0,0,120,90);
+  mctx.fillStyle = '#0a0c0f';
+  mctx.fillRect(0,0,120,90);
+  if (!state.fileLoaded) return;
+
+  // scale
+  mctx.save();
+  mctx.translate(60,45);
+  mctx.scale(0.09, 0.09);
+  if (state.mode === 'dwg') {
+    mctx.strokeStyle = 'rgba(224,80,80,0.6)'; mctx.lineWidth = 10;
+    mctx.strokeRect(-320,-200,640,400);
+    mctx.strokeStyle = 'rgba(61,220,132,0.5)'; mctx.lineWidth = 5;
+    mctx.beginPath();
+    for (let x=-320;x<=320;x+=160){mctx.moveTo(x,-200);mctx.lineTo(x,200);}
+    for (let y=-200;y<=200;y+=100){mctx.moveTo(-320,y);mctx.lineTo(320,y);}
+    mctx.stroke();
+  } else {
+    mctx.strokeStyle = 'rgba(27,143,227,0.6)'; mctx.lineWidth = 10;
+    mctx.strokeRect(-250,-200,500,400);
+  }
+
+  // Viewport indicator
+  const vx = -state.pan.x, vy = -state.pan.y;
+  const vs = 100 / (state.zoom/100) * 5;
+  mctx.strokeStyle = 'rgba(0,180,216,0.8)';
+  mctx.lineWidth = 8;
+  mctx.strokeRect(vx - vs/2, vy - vs/2, vs, vs);
+  mctx.restore();
+}
+
+/* ===================== TOOLS ===================== */
+function setTool(tool, btn) {
+  state.tool = tool;
+  document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  document.getElementById('toolDisplay').textContent = tool.replace('-',' ').replace(/\b\w/g,c=>c.toUpperCase());
+
+  if (tool.startsWith('measure')) {
+    state.measurePoints = [];
+    showToast('📏 Click to set measurement points. Double-click to finish.');
+  }
+}
+
+function fitToScreen() {
+  state.pan = { x: 0, y: 0 };
+  state.zoom = 100;
+  updateZoomDisplay();
+  showToast('⊡ Fit to screen');
+}
+
+function adjustZoom(delta) {
+  state.zoom = Math.max(10, Math.min(800, state.zoom + delta));
+  updateZoomDisplay();
+}
+
+function resetZoom() { state.zoom = 100; updateZoomDisplay(); }
+
+function updateZoomDisplay() {
+  document.getElementById('zoomVal').textContent = state.zoom + '%';
+}
+
+function toggleGrid() {
+  state.grid = !state.grid;
+  showToast(state.grid ? '⊞ Grid on' : '⊟ Grid off');
+}
+
+function prevView() { showToast('◁ Previous view'); }
+function nextView() { showToast('▷ Next view'); }
+
+function setViewAngle(v) {
+  state.viewAngle = v;
+  showToast('👁 View: ' + v.toUpperCase());
+}
+
+/* ===================== MOUSE ===================== */
+function onMouseDown(e) {
+  if (e.button !== 0) return;
+  state.dragging = true;
+  state.lastMouse = { x: e.clientX, y: e.clientY };
+
+  if (state.tool.startsWith('measure') && state.fileLoaded) {
+    const ca = document.getElementById('canvasArea').getBoundingClientRect();
+    const W = ca.width, H = ca.height;
+    const wx = (e.clientX - ca.left - state.pan.x - W/2) / (state.zoom/100);
+    const wy = (e.clientY - ca.top - state.pan.y - H/2) / (state.zoom/100);
+    state.measurePoints.push({ x: wx, y: wy });
+    updateMeasurePanel();
+  }
+}
+
+function onMouseMove(e) {
+  const ca = document.getElementById('canvasArea').getBoundingClientRect();
+  state.mousePos = { x: e.clientX - ca.left, y: e.clientY - ca.top };
+
+  const W = ca.width, H = ca.height;
+  const wx = (e.clientX - ca.left - state.pan.x - W/2) / (state.zoom/100);
+  const wy = (e.clientY - ca.top - state.pan.y - H/2) / (state.zoom/100);
+
+  document.getElementById('coordX').textContent = (wx * 0.01).toFixed(2);
+  document.getElementById('coordY').textContent = (-wy * 0.01).toFixed(2);
+
+  if (state.dragging && (state.tool === 'pan' || state.tool === 'select')) {
+    const dx = e.clientX - state.lastMouse.x;
+    const dy = e.clientY - state.lastMouse.y;
+    state.pan.x += dx;
+    state.pan.y += dy;
+    state.lastMouse = { x: e.clientX, y: e.clientY };
+  }
+}
+
+function onMouseUp(e) {
+  state.dragging = false;
+}
+
+function onWheel(e) {
+  e.preventDefault();
+  const delta = e.deltaY > 0 ? -5 : 5;
+  state.zoom = Math.max(10, Math.min(800, state.zoom + delta));
+  updateZoomDisplay();
+}
+
+/* ===================== MODE ===================== */
+function setMode(mode, btn) {
+  state.mode = mode;
+  document.querySelectorAll('.header-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('modeDisplay').textContent = mode === 'dwg' ? 'DWG Viewer' : 'NWD/NWC Viewer';
+  document.getElementById('coordZ').textContent = mode === 'nwd' ? '0.00' : '–';
+
+  // Show/hide layout selector
+  document.getElementById('layoutLabel').style.display = mode === 'dwg' ? '' : 'none';
+  document.getElementById('layoutSelector').style.display = mode === 'dwg' ? 'flex' : 'none';
+
+  // Update right panel
+  document.getElementById('rpanelTitle').innerHTML = mode === 'nwd'
+    ? '⚠ Clash Detection <span class="clash-badge" id="clashBadge">12</span>'
+    : 'ℹ Section Controls';
+
+  if (mode === 'nwd') buildClashPanel();
+  else buildSectionPanel();
+
+  showToast(mode === 'dwg' ? '📐 DWG mode' : '🧊 3D NWD/NWC mode');
+}
+
+function switchLayout(name, btn) {
+  state.currentLayout = name;
+  document.querySelectorAll('#layoutSelector .tool-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  showToast('📄 Layout: ' + name);
+}
+
+/* ===================== FILE ===================== */
+function triggerFileOpen() {
+  document.getElementById('fileInput').click();
+}
+
+function handleFileLoad(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const ext = file.name.split('.').pop().toLowerCase();
+
+  document.getElementById('loadingOverlay').classList.remove('hidden');
+  document.getElementById('loaderFill').style.animation = 'none';
+  document.getElementById('loaderFill').style.width = '0%';
+  document.getElementById('loaderText').textContent = 'Reading ' + ext.toUpperCase() + ' file...';
+
+  setTimeout(() => {
+    document.getElementById('loaderFill').style.transition = 'width 2s ease';
+    document.getElementById('loaderFill').style.width = '100%';
+    document.getElementById('loaderText').textContent = 'Processing geometry...';
+  }, 100);
+
+  setTimeout(() => {
+    document.getElementById('loadingOverlay').classList.add('hidden');
+    state.fileLoaded = true;
+    document.getElementById('dropZone').classList.add('hidden');
+    document.getElementById('fileNameDisplay').textContent = file.name;
+    document.getElementById('statusText').textContent = 'File loaded';
+
+    if (ext === 'nwd' || ext === 'nwc') {
+      const btn = document.querySelector('.header-tab:nth-child(2)');
+      setMode('nwd', btn);
+    } else {
+      const btn = document.querySelector('.header-tab:nth-child(1)');
+      setMode('dwg', btn);
+    }
+
+    updateFileProps(file);
+    showToast('✅ ' + file.name + ' loaded successfully');
+  }, 2800);
+}
+
+function updateFileProps(file) {
+  const ext = file.name.split('.').pop().toLowerCase();
+  const props = [
+    { key: 'filename', val: file.name },
+    { key: 'format', val: ext.toUpperCase() },
+    { key: 'size', val: (file.size/1024).toFixed(1) + ' KB' },
+    { key: 'modified', val: new Date(file.lastModified).toLocaleDateString() },
+    { key: 'units', val: 'Millimeters' },
+    { key: 'scale', val: '1:100' },
+    { key: 'coord-sys', val: 'WCS' },
+    { key: 'layers', val: layers.length.toString() },
+  ];
+  const el = document.getElementById('fileProps');
+  el.innerHTML = props.map(p =>
+    `<div class="prop-row"><div class="prop-key">${p.key}</div><div class="prop-val">${p.val}</div></div>`
+  ).join('');
+  document.getElementById('scaleDisplay').textContent = '1:100';
+}
+
+/* ===================== UI BUILDERS ===================== */
+function buildLayers() {
+  const el = document.getElementById('layerList');
+  el.innerHTML = layers.map((l, i) => `
+    <div class="layer-item" id="layer-${i}">
+      <div class="layer-eye ${l.visible?'':'hidden'}" onclick="toggleLayer(${i})" title="${l.visible?'Hide':'Show'}">
+        ${l.visible ? '👁' : '🚫'}
+      </div>
+      <div class="layer-color" style="background:${l.color}"></div>
+      <div class="layer-name ${l.visible?'':'hidden'}" id="lname-${i}">${l.name}</div>
+    </div>
+  `).join('');
+}
+
+function toggleLayer(i) {
+  layers[i].visible = !layers[i].visible;
+  document.getElementById('layer-'+i).querySelector('.layer-eye').innerHTML = layers[i].visible ? '👁' : '🚫';
+  document.getElementById('layer-'+i).querySelector('.layer-eye').className = 'layer-eye' + (layers[i].visible?'':' hidden');
+  document.getElementById('lname-'+i).className = 'layer-name' + (layers[i].visible?'':' hidden');
+}
+
+function filterLayers(q) {
+  layers.forEach((l, i) => {
+    const el = document.getElementById('layer-'+i);
+    if (el) el.style.display = l.name.toLowerCase().includes(q.toLowerCase()) ? '' : 'none';
+  });
+}
+
+function buildModelTree() {
+  const el = document.getElementById('modelTree');
+  el.innerHTML = modelTree.map(n => `
+    <div class="tree-item ${n.children.length?'':'leaf'}" onclick="selectTreeItem(${n.id}, this)"
+         style="padding-left:${8 + n.indent*14}px">
+      <div class="tree-arrow">${n.children.length ? '▾' : ' '}</div>
+      <div class="tree-icon">${n.icon}</div>
+      <span>${n.name}</span>
+    </div>
+  `).join('');
+}
+
+function selectTreeItem(id, el) {
+  document.querySelectorAll('.tree-item').forEach(t => t.classList.remove('selected'));
+  el.classList.add('selected');
+  const node = modelTree.find(n => n.id === id);
+  if (!node) return;
+  const props = [
+    { key: 'id', val: 'OBJ-' + String(id).padStart(4,'0') },
+    { key: 'name', val: node.name },
+    { key: 'type', val: 'Assembly' },
+    { key: 'level', val: 'L0' + node.indent },
+    { key: 'material', val: 'Concrete C30' },
+    { key: 'volume', val: (Math.random()*50+5).toFixed(2) + ' m³' },
+  ];
+  document.getElementById('objProps').innerHTML = props.map(p =>
+    `<div class="prop-row"><div class="prop-key">${p.key}</div><div class="prop-val">${p.val}</div></div>`
+  ).join('');
+}
+
+function buildProperties() {
+  document.getElementById('fileProps').innerHTML =
+    '<div style="padding:12px;font-size:11px;color:var(--text-muted)">Load a file to view properties</div>';
+}
+
+function buildClashPanel() {
+  const el = document.getElementById('rightPanelContent');
+  el.innerHTML = clashes.map((c, i) => `
+    <div class="clash-item" onclick="selectClash(${i}, this)">
+      <div class="clash-id">${c.id}</div>
+      <div class="clash-desc">${c.desc}</div>
+      <div class="clash-meta">
+        <span class="clash-tag tag-${c.type}">${c.type.toUpperCase()}</span>
+        <span style="font-size:10px;font-family:var(--font-mono);color:var(--text-muted);margin-left:auto">${c.dist}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function selectClash(i, el) {
+  document.querySelectorAll('.clash-item').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  showToast('⚠ ' + clashes[i].id + ': ' + clashes[i].desc);
+}
+
+function buildSectionPanel() {
+  const el = document.getElementById('rightPanelContent');
+  el.innerHTML = `
+    <div class="rpanel-header" style="font-size:10px;color:var(--text-muted);letter-spacing:.5px;text-transform:uppercase;padding:8px 12px">Section Planes</div>
+    <div class="section-widget">
+      ${['X','Y','Z'].map(ax => `
+        <div class="axis-slider">
+          <div class="axis-label ${ax.toLowerCase()}">${ax}</div>
+          <input type="range" min="-100" max="100" value="0" oninput="updateSection('${ax}',this.value,this.nextElementSibling)"/>
+          <div class="axis-val">0.00</div>
+        </div>
+      `).join('')}
+      <div style="padding:8px 0">
+        <button class="header-btn" style="width:100%;justify-content:center" onclick="showToast('✂ Section box enabled')">
+          ⬜ Section Box
+        </button>
+      </div>
+    </div>
+    <div class="rpanel-header" style="font-size:10px;color:var(--text-muted);letter-spacing:.5px;text-transform:uppercase;padding:8px 12px;border-top:1px solid var(--border)">Measurement</div>
+    <div class="measure-panel" id="measurePanel">
+      <div style="font-size:11px;color:var(--text-muted)">Use measure tools then click canvas</div>
+    </div>
+  `;
+}
+
+function updateSection(axis, val, display) {
+  display.textContent = parseFloat(val).toFixed(2);
+  showToast('✂ Section ' + axis + ': ' + parseFloat(val).toFixed(2) + 'm');
+}
+
+function updateMeasurePanel() {
+  const el = document.getElementById('measurePanel');
+  if (!el) return;
+  if (state.measurePoints.length < 2) return;
+  const p1 = state.measurePoints[state.measurePoints.length-2];
+  const p2 = state.measurePoints[state.measurePoints.length-1];
+  const dx = (p2.x - p1.x)*0.01, dy = (p2.y - p1.y)*0.01;
+  const dist = Math.sqrt(dx*dx+dy*dy);
+  el.innerHTML = `
+    <div class="measure-row"><div class="measure-label">Distance</div><div class="measure-value">${dist.toFixed(3)} m</div></div>
+    <div class="measure-row"><div class="measure-label">ΔX</div><div class="measure-value">${Math.abs(dx).toFixed(3)} m</div></div>
+    <div class="measure-row"><div class="measure-label">ΔY</div><div class="measure-value">${Math.abs(dy).toFixed(3)} m</div></div>
+    <div class="measure-row"><div class="measure-label">Angle</div><div class="measure-value">${(Math.atan2(dy,dx)*180/Math.PI).toFixed(2)}°</div></div>
+  `;
+}
+
+function toggleSection3D(type) {
+  if (state.mode !== 'nwd') { showToast('ℹ Section planes available in 3D mode'); return; }
+  showToast('✂ Section plane controls in right panel');
+}
+
+/* ===================== CONTEXT MENU ===================== */
+function showContextMenu(e) {
+  e.preventDefault();
+  const menu = document.getElementById('ctxMenu');
+  menu.style.left = e.clientX + 'px';
+  menu.style.top = e.clientY + 'px';
+  menu.classList.add('show');
+}
+
+function ctxAction(action) {
+  const msgs = {
+    isolate: '🔍 Object isolated',
+    hide: '👁 Object hidden',
+    color: '🎨 Color override applied',
+    measure: '📏 Measurement started from point',
+    properties: 'ℹ Properties panel updated',
+    'copy-coords': '📋 Coordinates copied to clipboard'
+  };
+  showToast(msgs[action] || action);
+  document.getElementById('ctxMenu').classList.remove('show');
+}
+
+/* ===================== PANEL UTILS ===================== */
+function switchTab(tab, btn) {
+  document.querySelectorAll('.panel-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-layers').style.display = tab === 'layers' ? '' : 'none';
+  document.getElementById('tab-model').style.display = tab === 'model' ? '' : 'none';
+  document.getElementById('tab-props').style.display = tab === 'props' ? '' : 'none';
+}
+
+function toggleSection(section) {
+  section.classList.toggle('collapsed');
+}
+
+/* ===================== TOAST ===================== */
+let _toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+/* ===================== DRAG & DROP ===================== */
+document.addEventListener('DOMContentLoaded', () => {
+  const ca = document.getElementById('canvasArea');
+  ca.addEventListener('dragover', e => { e.preventDefault(); });
+  ca.addEventListener('drop', e => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      const fakeInput = { files: [file] };
+      handleFileLoad(fakeInput);
+    }
+  });
+});
+
+// Demo: auto-load after short delay to show populated UI
+setTimeout(() => {
+  if (!state.fileLoaded) {
+    state.fileLoaded = true;
+    document.getElementById('dropZone').classList.add('hidden');
+    document.getElementById('fileNameDisplay').textContent = 'GroundFloor_Plan_RevA3.dwg';
+    document.getElementById('statusText').textContent = 'Demo file loaded';
+    buildProperties();
+    document.getElementById('fileProps').innerHTML = [
+      { key: 'filename', val: 'GroundFloor_Plan_RevA3.dwg' },
+      { key: 'format', val: 'DWG 2024' },
+      { key: 'size', val: '14.2 MB' },
+      { key: 'units', val: 'Millimeters' },
+      { key: 'scale', val: '1:100' },
+      { key: 'coord-sys', val: 'WCS' },
+      { key: 'layers', val: '12' },
+      { key: 'entities', val: '48,291' },
+    ].map(p => `<div class="prop-row"><div class="prop-key">${p.key}</div><div class="prop-val">${p.val}</div></div>`).join('');
+    document.getElementById('scaleDisplay').textContent = '1:100';
+    document.getElementById('clashBadge').textContent = '12';
+  }
+}, 2700);
+</script>
+</body>
+</html>
