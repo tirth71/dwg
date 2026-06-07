@@ -4,1966 +4,1432 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>SyncDrawing Viewer</title>
+
+<!-- DXF Parser (reads .dxf files — ASCII version of DWG) -->
+<script src="https://cdn.jsdelivr.net/npm/dxf-parser@1.1.2/dist/dxf-parser.min.js"></script>
+<!-- PDF.js for PDF rendering -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
-
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-  :root {
-    --bg-primary: #1a1d21;
-    --bg-secondary: #212428;
-    --bg-panel: #252830;
-    --bg-toolbar: #1e2126;
-    --bg-hover: #2d3138;
-    --bg-active: #0e639c;
-    --border: #363b44;
-    --border-light: #2e3340;
-    --text-primary: #d4d8e0;
-    --text-secondary: #8a909c;
-    --text-muted: #565d6e;
-    --accent-blue: #1b8fe3;
-    --accent-cyan: #00b4d8;
-    --accent-green: #3ddc84;
-    --accent-orange: #f08040;
-    --accent-red: #e05050;
-    --accent-yellow: #e0b040;
-    --font: 'IBM Plex Sans', sans-serif;
-    --font-mono: 'IBM Plex Mono', monospace;
-    --panel-width: 260px;
-    --toolbar-h: 44px;
-    --header-h: 48px;
-  }
-
-  body {
-    font-family: var(--font);
-    background: var(--bg-primary);
-    color: var(--text-primary);
-    height: 100vh;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    user-select: none;
-  }
-
-  /* ── HEADER ── */
-  header {
-    height: var(--header-h);
-    background: #141619;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    padding: 0 12px;
-    gap: 8px;
-    flex-shrink: 0;
-    z-index: 100;
-  }
-
-  .logo {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-right: 12px;
-  }
-
-  .logo-icon {
-    width: 28px; height: 28px;
-    background: linear-gradient(135deg, #1b8fe3, #00b4d8);
-    border-radius: 4px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 13px; font-weight: 700; color: #fff;
-    letter-spacing: -0.5px;
-  }
-
-  .logo-text {
-    font-size: 14px; font-weight: 600;
-    color: #e0e4ec;
-    letter-spacing: 0.2px;
-  }
-
-  .logo-text span { color: var(--accent-blue); }
-
-  .header-sep { width: 1px; height: 24px; background: var(--border); margin: 0 4px; }
-
-  .header-tabs {
-    display: flex;
-    gap: 2px;
-  }
-
-  .header-tab {
-    padding: 5px 14px;
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--text-secondary);
-    border-radius: 4px;
-    cursor: pointer;
-    transition: all .15s;
-    letter-spacing: 0.2px;
-  }
-
-  .header-tab:hover { background: var(--bg-hover); color: var(--text-primary); }
-  .header-tab.active { background: var(--bg-active); color: #fff; }
-
-  .header-right {
-    margin-left: auto;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .header-btn {
-    padding: 5px 12px;
-    font-size: 12px;
-    font-family: var(--font);
-    color: var(--text-secondary);
-    background: transparent;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    cursor: pointer;
-    transition: all .15s;
-    display: flex; align-items: center; gap: 5px;
-  }
-
-  .header-btn:hover { background: var(--bg-hover); color: var(--text-primary); border-color: #4a5260; }
-  .header-btn.primary { background: var(--accent-blue); border-color: var(--accent-blue); color: #fff; }
-  .header-btn.primary:hover { background: #2199f3; }
-
-  .file-name {
-    font-size: 12px;
-    color: var(--text-secondary);
-    font-family: var(--font-mono);
-    padding: 4px 10px;
-    background: var(--bg-panel);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-  }
-
-  /* ── MAIN LAYOUT ── */
-  .app-body {
-    flex: 1;
-    display: flex;
-    overflow: hidden;
-  }
-
-  /* ── LEFT PANEL ── */
-  .left-panel {
-    width: var(--panel-width);
-    background: var(--bg-panel);
-    border-right: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    flex-shrink: 0;
-    overflow: hidden;
-  }
-
-  .panel-tabs {
-    display: flex;
-    border-bottom: 1px solid var(--border);
-    background: var(--bg-toolbar);
-  }
-
-  .panel-tab {
-    flex: 1;
-    padding: 9px 6px;
-    font-size: 10px;
-    font-weight: 600;
-    text-align: center;
-    color: var(--text-muted);
-    cursor: pointer;
-    transition: all .15s;
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
-    border-bottom: 2px solid transparent;
-  }
-
-  .panel-tab:hover { color: var(--text-secondary); }
-  .panel-tab.active { color: var(--accent-blue); border-bottom-color: var(--accent-blue); }
-
-  .panel-content { flex: 1; overflow-y: auto; overflow-x: hidden; }
-  .panel-content::-webkit-scrollbar { width: 4px; }
-  .panel-content::-webkit-scrollbar-track { background: transparent; }
-  .panel-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-
-  .panel-section {
-    border-bottom: 1px solid var(--border-light);
-  }
-
-  .panel-section-header {
-    padding: 8px 12px;
-    font-size: 10px;
-    font-weight: 600;
-    color: var(--text-muted);
-    letter-spacing: 0.8px;
-    text-transform: uppercase;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    cursor: pointer;
-    background: var(--bg-secondary);
-  }
-
-  .panel-section-header:hover { color: var(--text-secondary); }
-
-  .chevron {
-    font-size: 9px;
-    transition: transform .2s;
-  }
-
-  .collapsed .chevron { transform: rotate(-90deg); }
-  .collapsed .section-body { display: none; }
-
-  /* LAYER TREE */
-  .layer-item {
-    display: flex;
-    align-items: center;
-    padding: 5px 12px;
-    gap: 6px;
-    cursor: pointer;
-    transition: background .1s;
-    font-size: 12px;
-  }
-
-  .layer-item:hover { background: var(--bg-hover); }
-
-  .layer-eye {
-    width: 14px; height: 14px;
-    color: var(--text-secondary);
-    font-size: 11px;
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
-    cursor: pointer;
-  }
-
-  .layer-eye.hidden { color: var(--text-muted); }
-
-  .layer-color {
-    width: 10px; height: 10px;
-    border-radius: 2px;
-    flex-shrink: 0;
-  }
-
-  .layer-name {
-    font-size: 11.5px;
-    color: var(--text-primary);
-    flex: 1;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .layer-name.hidden { color: var(--text-muted); text-decoration: line-through; }
-
-  /* MODEL TREE */
-  .tree-item {
-    display: flex;
-    align-items: center;
-    padding: 4px 12px;
-    gap: 5px;
-    cursor: pointer;
-    font-size: 11.5px;
-    color: var(--text-primary);
-    transition: background .1s;
-  }
-
-  .tree-item:hover { background: var(--bg-hover); }
-  .tree-item.selected { background: rgba(27,143,227,.18); color: var(--accent-blue); }
-
-  .tree-item .indent { flex-shrink: 0; }
-
-  .tree-arrow {
-    width: 12px; height: 12px;
-    font-size: 9px;
-    display: flex; align-items: center; justify-content: center;
-    color: var(--text-muted);
-    flex-shrink: 0;
-  }
-
-  .tree-icon {
-    width: 14px; height: 14px;
-    font-size: 11px;
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
-  }
-
-  /* SEARCH */
-  .search-box {
-    padding: 8px 10px;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .search-input {
-    width: 100%;
-    padding: 6px 10px;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    font-size: 11.5px;
-    font-family: var(--font);
-    color: var(--text-primary);
-    outline: none;
-    transition: border-color .15s;
-  }
-
-  .search-input:focus { border-color: var(--accent-blue); }
-  .search-input::placeholder { color: var(--text-muted); }
-
-  /* PROPERTIES */
-  .prop-row {
-    display: flex;
-    align-items: flex-start;
-    padding: 5px 12px;
-    gap: 8px;
-    border-bottom: 1px solid rgba(54,59,68,.4);
-  }
-
-  .prop-key {
-    font-size: 10.5px;
-    color: var(--text-muted);
-    width: 90px;
-    flex-shrink: 0;
-    padding-top: 1px;
-    font-family: var(--font-mono);
-  }
-
-  .prop-val {
-    font-size: 11px;
-    color: var(--text-primary);
-    flex: 1;
-    word-break: break-all;
-  }
-
-  /* ── VIEWPORT AREA ── */
-  .viewport-wrapper {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    position: relative;
-  }
-
-  /* ── TOOLBAR ── */
-  .toolbar {
-    height: var(--toolbar-h);
-    background: var(--bg-toolbar);
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    padding: 0 8px;
-    gap: 2px;
-    flex-shrink: 0;
-  }
-
-  .toolbar-sep { width: 1px; height: 24px; background: var(--border); margin: 0 4px; }
-
-  .tool-btn {
-    width: 32px; height: 32px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 14px;
-    color: var(--text-secondary);
-    background: transparent;
-    border: 1px solid transparent;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: all .15s;
-    position: relative;
-  }
-
-  .tool-btn:hover { background: var(--bg-hover); color: var(--text-primary); border-color: var(--border); }
-  .tool-btn.active { background: rgba(27,143,227,.2); color: var(--accent-blue); border-color: rgba(27,143,227,.4); }
-
-  .tool-btn .tooltip {
-    position: absolute;
-    bottom: -30px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: #0d0f12;
-    border: 1px solid var(--border);
-    padding: 3px 8px;
-    border-radius: 4px;
-    font-size: 10px;
-    color: var(--text-primary);
-    white-space: nowrap;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity .15s;
-    z-index: 999;
-  }
-
-  .tool-btn:hover .tooltip { opacity: 1; }
-
-  .tool-label {
-    padding: 0 8px;
-    font-size: 11px;
-    color: var(--text-secondary);
-    display: flex; align-items: center; gap: 5px;
-  }
-
-  /* ZOOM */
-  .zoom-control {
-    display: flex; align-items: center; gap: 4px;
-    margin-left: auto;
-  }
-
-  .zoom-val {
-    font-size: 11px;
-    font-family: var(--font-mono);
-    color: var(--text-secondary);
-    min-width: 44px;
-    text-align: center;
-    padding: 4px 6px;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    cursor: pointer;
-  }
-
-  /* ── CANVAS ── */
-  .canvas-area {
-    flex: 1;
-    position: relative;
-    overflow: hidden;
-    background: #0d0f12;
-    cursor: crosshair;
-  }
-
-  canvas#viewer {
-    position: absolute;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-  }
-
-  /* ── VIEW CUBE ── */
-  .view-cube {
-    position: absolute;
-    top: 16px; right: 16px;
-    width: 70px; height: 70px;
-    cursor: pointer;
-  }
-
-  .cube-face {
-    position: absolute;
-    width: 38px; height: 38px;
-    background: rgba(30,33,38,.85);
-    border: 1px solid var(--border);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 9px;
-    font-weight: 600;
-    color: var(--text-secondary);
-    letter-spacing: 0.5px;
-    transition: all .15s;
-  }
-
-  .cube-face:hover { background: rgba(27,143,227,.3); color: #fff; border-color: var(--accent-blue); }
-  .cube-top { top: 0; left: 16px; transform: perspective(60px) rotateX(40deg); }
-  .cube-front { top: 28px; left: 0; }
-  .cube-side { top: 28px; left: 32px; }
-
-  /* ── MINI MAP ── */
-  .mini-map {
-    position: absolute;
-    bottom: 56px; right: 16px;
-    width: 120px; height: 90px;
-    background: rgba(21,24,29,.9);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    overflow: hidden;
-  }
-
-  .mini-map canvas { width: 100%; height: 100%; }
-
-  .mini-map-label {
-    position: absolute;
-    top: 4px; left: 6px;
-    font-size: 9px;
-    color: var(--text-muted);
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
-    font-family: var(--font-mono);
-  }
-
-  /* ── STATUS BAR ── */
-  .status-bar {
-    height: 26px;
-    background: #141619;
-    border-top: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    padding: 0 12px;
-    gap: 16px;
-    flex-shrink: 0;
-  }
-
-  .status-item {
-    font-size: 10px;
-    font-family: var(--font-mono);
-    color: var(--text-muted);
-    display: flex; align-items: center; gap: 5px;
-  }
-
-  .status-item span { color: var(--text-secondary); }
-
-  .status-dot {
-    width: 6px; height: 6px;
-    border-radius: 50%;
-    background: var(--accent-green);
-    box-shadow: 0 0 4px var(--accent-green);
-  }
-
-  /* ── RIGHT PANEL ── */
-  .right-panel {
-    width: 240px;
-    background: var(--bg-panel);
-    border-left: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    flex-shrink: 0;
-  }
-
-  .rpanel-header {
-    padding: 10px 12px;
-    background: var(--bg-toolbar);
-    border-bottom: 1px solid var(--border);
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--text-primary);
-    letter-spacing: 0.3px;
-    display: flex; align-items: center; gap: 6px;
-  }
-
-  .clash-badge {
-    margin-left: auto;
-    padding: 1px 7px;
-    background: rgba(224,80,80,.2);
-    border: 1px solid rgba(224,80,80,.4);
-    border-radius: 10px;
-    font-size: 10px;
-    color: var(--accent-red);
-    font-weight: 600;
-  }
-
-  .rpanel-content { flex: 1; overflow-y: auto; }
-  .rpanel-content::-webkit-scrollbar { width: 4px; }
-  .rpanel-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-
-  /* CLASH LIST */
-  .clash-item {
-    padding: 8px 12px;
-    border-bottom: 1px solid var(--border-light);
-    cursor: pointer;
-    transition: background .12s;
-  }
-
-  .clash-item:hover { background: var(--bg-hover); }
-  .clash-item.selected { background: rgba(224,80,80,.1); border-left: 2px solid var(--accent-red); padding-left: 10px; }
-
-  .clash-id {
-    font-size: 10px;
-    font-family: var(--font-mono);
-    color: var(--text-muted);
-    margin-bottom: 2px;
-  }
-
-  .clash-desc {
-    font-size: 11.5px;
-    color: var(--text-primary);
-    margin-bottom: 3px;
-  }
-
-  .clash-meta {
-    display: flex; gap: 6px; align-items: center;
-  }
-
-  .clash-tag {
-    padding: 1px 6px;
-    border-radius: 3px;
-    font-size: 9.5px;
-    font-weight: 600;
-    letter-spacing: 0.3px;
-  }
-
-  .tag-hard { background: rgba(224,80,80,.2); color: var(--accent-red); }
-  .tag-soft { background: rgba(240,128,64,.2); color: var(--accent-orange); }
-  .tag-dup { background: rgba(224,176,64,.2); color: var(--accent-yellow); }
-
-  /* MEASUREMENT RESULT */
-  .measure-panel {
-    padding: 10px 12px;
-  }
-
-  .measure-row {
-    display: flex; justify-content: space-between;
-    padding: 5px 0;
-    border-bottom: 1px solid rgba(54,59,68,.4);
-  }
-
-  .measure-label { font-size: 11px; color: var(--text-muted); }
-  .measure-value { font-size: 11px; color: var(--accent-cyan); font-family: var(--font-mono); }
-
-  /* ── SECTION PLANES WIDGET ── */
-  .section-widget {
-    padding: 10px 12px;
-  }
-
-  .axis-slider {
-    display: flex; align-items: center; gap: 8px;
-    margin-bottom: 8px;
-  }
-
-  .axis-label {
-    font-size: 11px;
-    font-family: var(--font-mono);
-    font-weight: 600;
-    width: 14px;
-  }
-
-  .axis-label.x { color: var(--accent-red); }
-  .axis-label.y { color: var(--accent-green); }
-  .axis-label.z { color: var(--accent-blue); }
-
-  input[type=range] {
-    -webkit-appearance: none;
-    flex: 1;
-    height: 3px;
-    background: var(--border);
-    border-radius: 2px;
-    outline: none;
-    cursor: pointer;
-  }
-
-  input[type=range]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 12px; height: 12px;
-    border-radius: 50%;
-    background: var(--accent-blue);
-    cursor: pointer;
-    border: 2px solid var(--bg-panel);
-  }
-
-  .axis-val {
-    font-size: 10px;
-    font-family: var(--font-mono);
-    color: var(--text-secondary);
-    width: 34px;
-    text-align: right;
-  }
-
-  /* ── NOTIFICATION ── */
-  .toast {
-    position: fixed;
-    bottom: 40px; left: 50%;
-    transform: translateX(-50%) translateY(60px);
-    background: var(--bg-panel);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 8px 16px;
-    font-size: 12px;
-    color: var(--text-primary);
-    display: flex; align-items: center; gap: 8px;
-    z-index: 9999;
-    transition: transform .25s cubic-bezier(.34,1.56,.64,1);
-    box-shadow: 0 8px 32px rgba(0,0,0,.5);
-    pointer-events: none;
-  }
-
-  .toast.show { transform: translateX(-50%) translateY(0); }
-
-  /* ── LOADING OVERLAY ── */
-  .loading-overlay {
-    position: fixed; inset: 0;
-    background: rgba(13,15,18,.92);
-    z-index: 9000;
-    display: flex; align-items: center; justify-content: center;
-    flex-direction: column; gap: 16px;
-    transition: opacity .4s;
-  }
-
-  .loading-overlay.hidden { opacity: 0; pointer-events: none; }
-
-  .loader-bar {
-    width: 300px; height: 3px;
-    background: var(--border);
-    border-radius: 2px;
-    overflow: hidden;
-  }
-
-  .loader-fill {
-    height: 100%;
-    background: linear-gradient(90deg, var(--accent-blue), var(--accent-cyan));
-    border-radius: 2px;
-    width: 0%;
-    transition: width .3s ease;
-    animation: load 2.5s ease forwards;
-  }
-
-  @keyframes load {
-    0% { width: 0%; }
-    40% { width: 55%; }
-    70% { width: 78%; }
-    90% { width: 92%; }
-    100% { width: 100%; }
-  }
-
-  .loader-text {
-    font-size: 12px;
-    color: var(--text-secondary);
-    font-family: var(--font-mono);
-    letter-spacing: 0.3px;
-  }
-
-  .loader-title {
-    font-size: 18px;
-    font-weight: 600;
-    color: var(--text-primary);
-  }
-
-  /* ── FILE DROP ZONE ── */
-  .drop-zone {
-    position: absolute; inset: 0;
-    display: flex; align-items: center; justify-content: center;
-    flex-direction: column; gap: 12px;
-    z-index: 10;
-  }
-
-  .drop-zone.hidden { display: none; }
-
-  .drop-icon {
-    width: 64px; height: 64px;
-    background: rgba(27,143,227,.12);
-    border: 1.5px dashed rgba(27,143,227,.4);
-    border-radius: 12px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 28px;
-    margin-bottom: 4px;
-  }
-
-  .drop-title {
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--text-primary);
-  }
-
-  .drop-sub {
-    font-size: 12px;
-    color: var(--text-muted);
-  }
-
-  .drop-formats {
-    display: flex; gap: 8px; margin-top: 4px;
-  }
-
-  .fmt-chip {
-    padding: 3px 10px;
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    font-size: 11px;
-    font-family: var(--font-mono);
-    color: var(--text-secondary);
-    background: var(--bg-panel);
-  }
-
-  .fmt-chip.dwg { border-color: rgba(0,180,216,.4); color: var(--accent-cyan); }
-  .fmt-chip.nwd { border-color: rgba(61,220,132,.4); color: var(--accent-green); }
-  .fmt-chip.nwc { border-color: rgba(240,128,64,.4); color: var(--accent-orange); }
-
-  /* ── MISC ── */
-  .badge {
-    display: inline-flex; align-items: center; justify-content: center;
-    min-width: 16px; height: 16px;
-    padding: 0 4px;
-    background: var(--accent-red);
-    border-radius: 8px;
-    font-size: 9px;
-    font-weight: 700;
-    color: #fff;
-    margin-left: auto;
-  }
-
-  .coord-display {
-    display: flex; gap: 10px;
-    margin-right: 8px;
-  }
-
-  .coord-item {
-    font-size: 10px;
-    font-family: var(--font-mono);
-    color: var(--text-muted);
-  }
-
-  .coord-item span { color: var(--text-secondary); }
-
-  /* CONTEXT MENU */
-  .ctx-menu {
-    position: fixed;
-    background: var(--bg-panel);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    min-width: 160px;
-    z-index: 9999;
-    box-shadow: 0 8px 32px rgba(0,0,0,.5);
-    padding: 4px 0;
-    display: none;
-  }
-
-  .ctx-menu.show { display: block; }
-
-  .ctx-item {
-    padding: 7px 14px;
-    font-size: 12px;
-    color: var(--text-primary);
-    cursor: pointer;
-    display: flex; align-items: center; gap: 8px;
-  }
-
-  .ctx-item:hover { background: var(--bg-hover); }
-  .ctx-item .icon { font-size: 13px; width: 16px; }
-  .ctx-sep { height: 1px; background: var(--border); margin: 3px 0; }
-
-  .mode-3d-only { display: none; }
-
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg0:#0d0f12;--bg1:#141619;--bg2:#1a1d21;--bg3:#212428;--bg4:#252830;--bg5:#2d3138;
+  --border:#363b44;--border2:#2a2f38;
+  --t1:#d4d8e0;--t2:#8a909c;--t3:#565d6e;
+  --blue:#1b8fe3;--cyan:#00b4d8;--green:#3ddc84;--orange:#f08040;--red:#e05050;--yellow:#e0b040;
+  --font:'IBM Plex Sans',sans-serif;--mono:'IBM Plex Mono',monospace;
+  --hh:48px;--th:44px;--sh:26px;--lp:260px;--rp:240px;
+}
+html,body{height:100%;width:100%;overflow:hidden;font-family:var(--font);background:var(--bg0);color:var(--t1);user-select:none}
+::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+
+/* ── LOADING ── */
+#ls{position:fixed;inset:0;z-index:9999;background:var(--bg0);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;transition:opacity .5s}
+#ls.out{opacity:0;pointer-events:none}
+.ls-icon{width:50px;height:50px;background:linear-gradient(135deg,var(--blue),var(--cyan));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#fff;letter-spacing:-.5px}
+.ls-title{font-size:22px;font-weight:600}.ls-title b{color:var(--blue)}
+.ls-bar{width:280px;height:3px;background:var(--border);border-radius:2px;overflow:hidden}
+.ls-fill{height:100%;background:linear-gradient(90deg,var(--blue),var(--cyan));border-radius:2px;width:0;transition:width .35s}
+.ls-msg{font-size:11px;color:var(--t3);font-family:var(--mono)}
+
+/* ── LAYOUT ── */
+#H{height:var(--hh);background:var(--bg1);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 10px;gap:6px;flex-shrink:0;z-index:200}
+#B{display:flex;height:calc(100vh - var(--hh));overflow:hidden}
+
+/* ── HEADER ── */
+.logo{display:flex;align-items:center;gap:8px;margin-right:8px}
+.logo-i{width:28px;height:28px;background:linear-gradient(135deg,var(--blue),var(--cyan));border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff}
+.logo-t{font-size:14px;font-weight:600;color:var(--t1)}.logo-t b{color:var(--blue)}
+.vsep{width:1px;height:24px;background:var(--border);margin:0 2px}
+.htab{padding:5px 13px;font-size:12px;font-weight:500;color:var(--t2);background:transparent;border:1px solid transparent;border-radius:4px;cursor:pointer;font-family:var(--font);transition:all .15s}
+.htab:hover{background:var(--bg5);color:var(--t1)}.htab.on{background:#0e639c;color:#fff;border-color:#0e639c}
+.fchip{display:flex;align-items:center;gap:6px;padding:4px 10px;background:var(--bg4);border:1px solid var(--border);border-radius:4px;font-size:11px;font-family:var(--mono);color:var(--t2);max-width:300px}
+.fchip-n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
+.hb{padding:5px 11px;font-size:12px;color:var(--t2);background:transparent;border:1px solid var(--border);border-radius:4px;cursor:pointer;font-family:var(--font);display:flex;align-items:center;gap:5px;transition:all .15s;white-space:nowrap}
+.hb:hover{background:var(--bg5);color:var(--t1);border-color:#4a5260}
+.hb.pri{background:var(--blue);border-color:var(--blue);color:#fff}.hb.pri:hover{background:#2199f3}
+
+/* ── LEFT PANEL ── */
+#LP{width:var(--lp);background:var(--bg4);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden}
+.ptabs{display:flex;background:var(--bg3);border-bottom:1px solid var(--border);flex-shrink:0}
+.ptab{flex:1;padding:9px 4px;text-align:center;font-size:10px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--t3);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s}
+.ptab:hover{color:var(--t2)}.ptab.on{color:var(--blue);border-bottom-color:var(--blue)}
+.pp{flex:1;display:flex;flex-direction:column;overflow:hidden}.pp.h{display:none!important}
+.sbox{padding:8px 10px;border-bottom:1px solid var(--border2);flex-shrink:0}
+.sin{width:100%;padding:6px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;font-family:var(--font);font-size:11.5px;color:var(--t1);outline:none;transition:border-color .15s}
+.sin:focus{border-color:var(--blue)}.sin::placeholder{color:var(--t3)}
+.sc{flex:1;overflow-y:auto;overflow-x:hidden}
+
+/* LAYERS */
+.lrow{display:flex;align-items:center;padding:5px 10px;gap:6px;cursor:default;transition:background .1s;border-bottom:1px solid rgba(54,59,68,.22)}
+.lrow:hover{background:var(--bg5)}
+.eye{width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:13px;cursor:pointer;border-radius:3px;flex-shrink:0;transition:all .12s}
+.eye:hover{background:var(--bg3)}
+.sw{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+.ln{font-size:11.5px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:all .15s}
+.ln.off{color:var(--t3);text-decoration:line-through}.lrow.off .eye{opacity:.55}
+
+/* TREE */
+.trow{display:flex;align-items:center;gap:4px;padding:4px 10px;font-size:11.5px;cursor:pointer;transition:background .1s}
+.trow:hover{background:var(--bg5)}.trow.on{background:rgba(27,143,227,.18);color:var(--blue)}
+.tarr{width:12px;text-align:center;font-size:9px;color:var(--t3)}
+
+/* PROPS */
+.prow{display:flex;padding:5px 10px;gap:8px;border-bottom:1px solid rgba(54,59,68,.28)}
+.pk{font-size:10.5px;color:var(--t3);width:86px;flex-shrink:0;font-family:var(--mono)}
+.pv{font-size:11px;color:var(--t1);flex:1;word-break:break-all}
+.psec{padding:6px 10px;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--t3);background:var(--bg3);border-bottom:1px solid var(--border2)}
+.empty{padding:16px 12px;font-size:11px;color:var(--t3);text-align:center}
+
+/* ── VIEWPORT ── */
+#VW{flex:1;display:flex;flex-direction:column;overflow:hidden}
+#TB{height:var(--th);background:var(--bg3);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 8px;gap:2px;flex-shrink:0;overflow-x:auto}
+#TB::-webkit-scrollbar{height:3px}
+.tg{display:flex;align-items:center;gap:2px}
+.tsep{width:1px;height:22px;background:var(--border);margin:0 4px;flex-shrink:0}
+.tlbl{font-size:9.5px;color:var(--t3);letter-spacing:.5px;text-transform:uppercase;margin-right:2px;flex-shrink:0}
+.tb{height:28px;padding:0 8px;display:flex;align-items:center;gap:4px;font-size:12px;font-family:var(--font);color:var(--t2);background:transparent;border:1px solid transparent;border-radius:3px;cursor:pointer;white-space:nowrap;transition:all .15s;flex-shrink:0}
+.tb span{font-size:11px}.tb:hover{background:var(--bg5);color:var(--t1);border-color:var(--border)}
+.tb.on{background:rgba(27,143,227,.2);color:var(--blue);border-color:rgba(27,143,227,.4)}
+.zb{padding:3px 8px;font-size:11px;font-family:var(--mono);color:var(--t2);background:var(--bg3);border:1px solid var(--border);border-radius:3px;cursor:pointer;min-width:52px;text-align:center;flex-shrink:0}
+
+/* ── CANVAS WRAP ── */
+#CW{flex:1;position:relative;overflow:hidden;background:var(--bg0)}
+#MC{position:absolute;inset:0;width:100%;height:100%}
+
+/* ── DROP ZONE ── */
+#DZ{position:absolute;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;background:var(--bg0)}
+#DZ.h{display:none}
+.dzi{width:64px;height:64px;background:rgba(27,143,227,.1);border:1.5px dashed rgba(27,143,227,.4);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:30px;margin-bottom:4px}
+.dzt{font-size:18px;font-weight:600;color:var(--t1)}.dzs{font-size:13px;color:var(--t2)}
+.dzc{display:flex;gap:8px;margin-top:4px;flex-wrap:wrap;justify-content:center}
+.dzch{padding:3px 10px;border-radius:12px;font-size:11px;font-family:var(--mono);border:1px solid var(--border);color:var(--t2);background:var(--bg4)}
+.dzch.dwg{border-color:rgba(0,180,216,.4);color:var(--cyan)}
+.dzch.nwd{border-color:rgba(61,220,132,.4);color:var(--green)}
+.dzch.img{border-color:rgba(224,176,64,.4);color:var(--yellow)}
+.dzch.pdf{border-color:rgba(224,80,80,.4);color:var(--red)}
+.dzch.dxf{border-color:rgba(160,120,232,.4);color:#a078e8}
+
+/* ── UNSUPPORTED NOTICE ── */
+#UNS{position:absolute;inset:0;z-index:8;display:none;align-items:center;justify-content:center;flex-direction:column;gap:12px;background:var(--bg0)}
+#UNS.show{display:flex}
+.uns-icon{font-size:48px}
+.uns-title{font-size:18px;font-weight:600;color:var(--t1)}
+.uns-sub{font-size:13px;color:var(--t2);text-align:center;max-width:440px;line-height:1.6}
+.uns-note{font-size:11px;color:var(--t3);font-family:var(--mono);background:var(--bg4);border:1px solid var(--border);padding:8px 14px;border-radius:6px;text-align:left;max-width:440px}
+
+/* ── VIEW CUBE ── */
+#VC{position:absolute;top:14px;right:14px;width:68px;height:68px;cursor:pointer;z-index:5}
+.cf{position:absolute;width:36px;height:36px;background:rgba(30,33,38,.88);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;color:var(--t2);letter-spacing:.4px;transition:all .15s}
+.cf:hover{background:rgba(27,143,227,.3);color:#fff;border-color:var(--blue)}
+.cf-t{top:0;left:16px;transform:perspective(55px) rotateX(40deg)}
+.cf-f{top:28px;left:0}.cf-s{top:28px;left:32px}
+
+/* ── MINI MAP ── */
+#MM{position:absolute;bottom:36px;right:14px;width:110px;height:82px;background:rgba(21,24,29,.92);border:1px solid var(--border);border-radius:4px;overflow:hidden;z-index:5}
+#MM canvas{width:100%;height:100%}
+.mml{position:absolute;top:3px;left:5px;font-size:8px;color:var(--t3);font-family:var(--mono);letter-spacing:.5px;text-transform:uppercase}
+
+/* ── STATUS BAR ── */
+#SB{height:var(--sh);background:var(--bg1);border-top:1px solid var(--border);display:flex;align-items:center;padding:0 12px;gap:14px;flex-shrink:0}
+.si{font-size:10px;font-family:var(--mono);color:var(--t3);display:flex;align-items:center;gap:4px}
+.si b{color:var(--t2);font-weight:400}
+.sdt{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 4px var(--green)}
+.sdt.busy{background:var(--yellow);box-shadow:0 0 4px var(--yellow)}
+.sdt.err{background:var(--red);box-shadow:0 0 4px var(--red)}
+
+/* ── RIGHT PANEL ── */
+#RP{width:var(--rp);background:var(--bg4);border-left:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden}
+.rph{padding:10px 12px;background:var(--bg3);border-bottom:1px solid var(--border);font-size:11.5px;font-weight:600;display:flex;align-items:center;gap:6px;flex-shrink:0}
+.cb{margin-left:auto;padding:1px 7px;background:rgba(224,80,80,.2);border:1px solid rgba(224,80,80,.4);border-radius:10px;font-size:10px;color:var(--red);font-weight:700}
+
+/* CLASH */
+.crow{padding:8px 12px;border-bottom:1px solid var(--border2);cursor:pointer;transition:background .12s}
+.crow:hover{background:var(--bg5)}.crow.on{background:rgba(224,80,80,.1);border-left:2px solid var(--red);padding-left:10px}
+.cid{font-size:10px;font-family:var(--mono);color:var(--t3);margin-bottom:2px}
+.cdesc{font-size:11.5px;color:var(--t1);margin-bottom:4px}
+.cmeta{display:flex;align-items:center;gap:6px}
+.ct{padding:1px 6px;border-radius:3px;font-size:9.5px;font-weight:600}
+.ct.hard{background:rgba(224,80,80,.2);color:var(--red)}.ct.soft{background:rgba(240,128,64,.2);color:var(--orange)}.ct.dup{background:rgba(224,176,64,.2);color:var(--yellow)}
+.cdist{font-size:10px;font-family:var(--mono);color:var(--t3);margin-left:auto}
+
+/* SECTION */
+.scc{padding:10px 12px}
+.ar{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.al{font-size:11px;font-family:var(--mono);font-weight:600;width:12px}
+.al.x{color:var(--red)}.al.y{color:var(--green)}.al.z{color:var(--blue)}
+input[type=range]{-webkit-appearance:none;flex:1;height:3px;background:var(--border);border-radius:2px;outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:var(--blue);cursor:pointer;border:2px solid var(--bg4)}
+.av{font-size:10px;font-family:var(--mono);color:var(--t2);width:36px;text-align:right}
+.mr{display:flex;justify-content:space-between;padding:5px 12px;border-bottom:1px solid rgba(54,59,68,.3)}
+.ml2{font-size:11px;color:var(--t3)}.mv{font-size:11px;color:var(--cyan);font-family:var(--mono)}
+
+/* CONTEXT MENU */
+#CTX{position:fixed;background:var(--bg4);border:1px solid var(--border);border-radius:6px;min-width:160px;z-index:9999;padding:4px 0;box-shadow:0 8px 32px rgba(0,0,0,.5);display:none}
+#CTX.show{display:block}
+.ci{padding:7px 14px;font-size:12px;cursor:pointer;transition:background .1s}.ci:hover{background:var(--bg5)}
+.csep{height:1px;background:var(--border);margin:3px 0}
+
+/* UPLOAD MODAL */
+#UM{position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center}
+#UM.show{display:flex}
+.umbox{background:var(--bg4);border:1px solid var(--border);border-radius:10px;padding:28px 32px;width:360px;box-shadow:0 16px 48px rgba(0,0,0,.6)}
+.umt{font-size:15px;font-weight:600;margin-bottom:4px}
+.ums{font-size:12px;color:var(--t2);margin-bottom:16px}
+.umb{height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin-bottom:16px}
+.umf{height:100%;background:linear-gradient(90deg,var(--blue),var(--cyan));border-radius:2px;width:0;transition:width .4s}
+.umsteps{display:flex;flex-direction:column;gap:8px}
+.umst{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--t3);transition:color .2s}
+.umst.done{color:var(--green)}.umst.active{color:var(--t1)}
+.umd{width:8px;height:8px;border-radius:50%;background:var(--border);flex-shrink:0;transition:background .2s}
+.umst.done .umd{background:var(--green)}.umst.active .umd{background:var(--blue);box-shadow:0 0 4px var(--blue)}
+
+/* TOAST */
+#T{position:fixed;bottom:38px;left:50%;transform:translateX(-50%) translateY(60px);background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:8px 18px;font-size:12px;box-shadow:0 8px 32px rgba(0,0,0,.5);z-index:9999;pointer-events:none;transition:transform .25s cubic-bezier(.34,1.56,.64,1);white-space:nowrap;max-width:500px}
+#T.show{transform:translateX(-50%) translateY(0)}
 </style>
 </head>
 <body>
 
 <!-- LOADING -->
-<div class="loading-overlay" id="loadingOverlay">
-  <div class="drop-icon" style="margin-bottom:0">📐</div>
-  <div class="loader-title">SyncDrawing Viewer</div>
-  <div class="loader-bar"><div class="loader-fill" id="loaderFill"></div></div>
-  <div class="loader-text" id="loaderText">Initializing WebGL renderer...</div>
+<div id="ls">
+  <div class="ls-icon">SD</div>
+  <div class="ls-title">Sync<b>Drawing</b> Viewer</div>
+  <div class="ls-bar"><div class="ls-fill" id="lsf"></div></div>
+  <div class="ls-msg" id="lsm">Initializing…</div>
 </div>
 
 <!-- HEADER -->
-<header>
-  <div class="logo">
-    <div class="logo-icon">SD</div>
-    <div class="logo-text">Sync<span>Drawing</span></div>
+<div id="H">
+  <div class="logo"><div class="logo-i">SD</div><div class="logo-t">Sync<b>Drawing</b></div></div>
+  <div class="vsep"></div>
+  <button class="htab on" onclick="setMode('dwg',this)">DWG</button>
+  <button class="htab" onclick="setMode('nwd',this)">NWD / NWC</button>
+  <div class="vsep"></div>
+  <div class="fchip"><span>📄</span><span class="fchip-n" id="fcn">No file loaded</span></div>
+  <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
+    <button class="hb" onclick="doExport()">⬆ Export</button>
+    <button class="hb" onclick="doShare()">🔗 Share</button>
+    <button class="hb pri" onclick="triggerUpload()">📂 Open File</button>
+    <input type="file" id="FI" accept=".dwg,.dxf,.nwd,.nwc,.ifc,.rvt,.pdf,.png,.jpg,.jpeg,.gif,.bmp,.webp,.svg"
+           style="display:none" onchange="handleFile(this)"/>
   </div>
-  <div class="header-sep"></div>
-  <div class="header-tabs">
-    <div class="header-tab active" onclick="setMode('dwg',this)">DWG</div>
-    <div class="header-tab" onclick="setMode('nwd',this)">NWD / NWC</div>
-  </div>
-  <div class="header-sep"></div>
-  <div class="file-name" id="fileNameDisplay">No file loaded</div>
-  <div class="header-right">
-    <button class="header-btn" onclick="showToast('📤 Export options coming soon')">⬆ Export</button>
-    <button class="header-btn" onclick="showToast('🔗 Sharing link copied!')">🔗 Share</button>
-    <button class="header-btn primary" onclick="triggerFileOpen()">📂 Open File</button>
-    <input type="file" id="fileInput" accept=".dwg,.nwd,.nwc" style="display:none" onchange="handleFileLoad(this)"/>
-  </div>
-</header>
+</div>
 
 <!-- BODY -->
-<div class="app-body">
+<div id="B">
 
   <!-- LEFT PANEL -->
-  <div class="left-panel" id="leftPanel">
-    <div class="panel-tabs">
-      <div class="panel-tab active" onclick="switchTab('layers',this)">Layers</div>
-      <div class="panel-tab" onclick="switchTab('model',this)">Model</div>
-      <div class="panel-tab" onclick="switchTab('props',this)">Props</div>
+  <div id="LP">
+    <div class="ptabs">
+      <div class="ptab on" onclick="showPP('layers',this)">Layers</div>
+      <div class="ptab" onclick="showPP('tree',this)">Model</div>
+      <div class="ptab" onclick="showPP('props',this)">Props</div>
     </div>
-
-    <!-- LAYERS TAB -->
-    <div class="panel-content" id="tab-layers">
-      <div class="search-box">
-        <input class="search-input" type="text" placeholder="Search layers..." oninput="filterLayers(this.value)"/>
-      </div>
-      <div class="panel-section">
-        <div class="panel-section-header" onclick="toggleSection(this.parentNode)">
-          <span>Drawing Layers</span>
-          <span class="chevron">▾</span>
-        </div>
-        <div class="section-body" id="layerList"></div>
-      </div>
+    <div class="pp" id="pp-layers">
+      <div class="sbox"><input class="sin" type="text" placeholder="Search layers…" oninput="filterL(this.value)"/></div>
+      <div class="sc" id="LL"></div>
     </div>
-
-    <!-- MODEL TAB -->
-    <div class="panel-content" id="tab-model" style="display:none">
-      <div class="search-box">
-        <input class="search-input" type="text" placeholder="Search objects..."/>
-      </div>
-      <div id="modelTree"></div>
+    <div class="pp h" id="pp-tree">
+      <div class="sbox"><input class="sin" type="text" placeholder="Search objects…" oninput="filterT(this.value)"/></div>
+      <div class="sc" id="MT"></div>
     </div>
-
-    <!-- PROPERTIES TAB -->
-    <div class="panel-content" id="tab-props" style="display:none">
-      <div class="panel-section">
-        <div class="panel-section-header" onclick="toggleSection(this.parentNode)">
-          <span>File Properties</span>
-          <span class="chevron">▾</span>
-        </div>
-        <div class="section-body" id="fileProps"></div>
-      </div>
-      <div class="panel-section">
-        <div class="panel-section-header" onclick="toggleSection(this.parentNode)">
-          <span>Object Properties</span>
-          <span class="chevron">▾</span>
-        </div>
-        <div class="section-body" id="objProps">
-          <div style="padding:12px;font-size:11px;color:var(--text-muted)">Select an object to view properties</div>
-        </div>
-      </div>
+    <div class="pp h" id="pp-props">
+      <div class="sc" id="PA"><div class="empty">Load a file to view properties</div></div>
     </div>
   </div>
 
   <!-- VIEWPORT -->
-  <div class="viewport-wrapper">
-    <!-- TOOLBAR -->
-    <div class="toolbar">
-      <!-- Navigation group -->
-      <div class="tool-label" style="font-size:10px;color:var(--text-muted);letter-spacing:.5px;text-transform:uppercase;margin-right:2px">NAV</div>
-      <button class="tool-btn active" id="btnSelect" onclick="setTool('select',this)" title="">
-        ↖<span class="tooltip">Select</span>
-      </button>
-      <button class="tool-btn" id="btnPan" onclick="setTool('pan',this)">
-        ✋<span class="tooltip">Pan</span>
-      </button>
-      <button class="tool-btn" id="btnOrbit" onclick="setTool('orbit',this)">
-        🔄<span class="tooltip">Orbit (3D)</span>
-      </button>
-      <button class="tool-btn" onclick="fitToScreen()">
-        ⊡<span class="tooltip">Fit to Screen</span>
-      </button>
-      <button class="tool-btn" onclick="prevView()">◁<span class="tooltip">Previous View</span></button>
-      <button class="tool-btn" onclick="nextView()">▷<span class="tooltip">Next View</span></button>
-      <div class="toolbar-sep"></div>
-
-      <!-- Measure group -->
-      <div class="tool-label" style="font-size:10px;color:var(--text-muted);letter-spacing:.5px;text-transform:uppercase;margin-right:2px">MEASURE</div>
-      <button class="tool-btn" onclick="setTool('measure-linear',this)">📏<span class="tooltip">Linear Measure</span></button>
-      <button class="tool-btn" onclick="setTool('measure-area',this)">⬜<span class="tooltip">Area Measure</span></button>
-      <button class="tool-btn" onclick="setTool('measure-angle',this)">📐<span class="tooltip">Angle Measure</span></button>
-      <button class="tool-btn" onclick="setTool('measure-radius',this)">◎<span class="tooltip">Radius</span></button>
-      <div class="toolbar-sep"></div>
-
-      <!-- View group -->
-      <div class="tool-label" style="font-size:10px;color:var(--text-muted);letter-spacing:.5px;text-transform:uppercase;margin-right:2px">VIEW</div>
-      <button class="tool-btn" onclick="toggleSection3D('section')">✂<span class="tooltip">Section Planes</span></button>
-      <button class="tool-btn" onclick="showToast('🌐 Walk mode activated')">🚶<span class="tooltip">Walk Mode</span></button>
-      <button class="tool-btn" onclick="showToast('✈ Fly mode activated')">✈<span class="tooltip">Fly Mode</span></button>
-      <button class="tool-btn" onclick="toggleGrid()">⊞<span class="tooltip">Toggle Grid</span></button>
-      <div class="toolbar-sep"></div>
-
-      <!-- Layout selector (DWG) -->
-      <div class="tool-label" id="layoutLabel" style="font-size:10px;color:var(--text-muted)">Layout:</div>
-      <div id="layoutSelector" style="display:flex;gap:2px">
-        <button class="tool-btn active" style="width:auto;padding:0 8px;font-size:10px" onclick="switchLayout('Model',this)">Model</button>
-        <button class="tool-btn" style="width:auto;padding:0 8px;font-size:10px" onclick="switchLayout('Sheet 1',this)">Sheet 1</button>
-        <button class="tool-btn" style="width:auto;padding:0 8px;font-size:10px" onclick="switchLayout('Sheet 2',this)">Sheet 2</button>
+  <div id="VW">
+    <div id="TB">
+      <span class="tlbl">NAV</span>
+      <div class="tg">
+        <button class="tb on" id="bSel" onclick="setTool('select',this)">↖ <span>Select</span></button>
+        <button class="tb" id="bPan" onclick="setTool('pan',this)">✋ <span>Pan</span></button>
+        <button class="tb" id="bOrb" onclick="setTool('orbit',this)">🔄 <span>Orbit</span></button>
+        <button class="tb" onclick="fitScreen()">⊡ <span>Fit</span></button>
+        <button class="tb" onclick="goBack()">◁</button>
+        <button class="tb" onclick="goFwd()">▷</button>
       </div>
-
-      <!-- Zoom -->
-      <div class="zoom-control">
-        <button class="tool-btn" onclick="adjustZoom(-10)">−</button>
-        <div class="zoom-val" id="zoomVal" onclick="resetZoom()">100%</div>
-        <button class="tool-btn" onclick="adjustZoom(10)">+</button>
+      <div class="tsep"></div>
+      <span class="tlbl">MEASURE</span>
+      <div class="tg">
+        <button class="tb" id="bML" onclick="setTool('mlin',this)">📏 <span>Linear</span></button>
+        <button class="tb" id="bMA" onclick="setTool('marea',this)">⬜ <span>Area</span></button>
+        <button class="tb" id="bMG" onclick="setTool('mang',this)">📐 <span>Angle</span></button>
+        <button class="tb" onclick="clearMeas()">✕ <span>Clear</span></button>
+      </div>
+      <div class="tsep"></div>
+      <span class="tlbl">VIEW</span>
+      <div class="tg">
+        <button class="tb" onclick="toggleGrid()">⊞ <span>Grid</span></button>
+        <button class="tb" onclick="showT('🚶 Walk mode')">🚶</button>
+        <button class="tb" onclick="showT('✈ Fly mode')">✈</button>
+      </div>
+      <div class="tsep"></div>
+      <span class="tlbl" id="lLbl">LAYOUT</span>
+      <div class="tg" id="lBtns">
+        <button class="tb on" onclick="switchLayout('Model',this)">Model</button>
+        <button class="tb" onclick="switchLayout('Sheet 1',this)">S1</button>
+        <button class="tb" onclick="switchLayout('Sheet 2',this)">S2</button>
+      </div>
+      <div class="tsep"></div>
+      <div class="tg" style="margin-left:auto">
+        <button class="tb" onclick="adjZ(-10)">−</button>
+        <span class="zb" id="ZB" onclick="resetZ()">100%</span>
+        <button class="tb" onclick="adjZ(10)">+</button>
       </div>
     </div>
 
-    <!-- CANVAS -->
-    <div class="canvas-area" id="canvasArea"
-         onmousedown="onMouseDown(event)"
-         onmousemove="onMouseMove(event)"
-         onmouseup="onMouseUp(event)"
-         onwheel="onWheel(event)"
-         oncontextmenu="showContextMenu(event)">
+    <div id="CW"
+      onmousedown="mDown(event)" onmousemove="mMove(event)" onmouseup="mUp(event)"
+      onwheel="mWheel(event)" ondblclick="mDbl(event)"
+      oncontextmenu="showCtx(event)"
+      ondragover="event.preventDefault()" ondrop="onDrop(event)">
 
-      <canvas id="viewer"></canvas>
+      <canvas id="MC"></canvas>
 
-      <!-- DROP ZONE (shown when no file) -->
-      <div class="drop-zone" id="dropZone">
-        <div class="drop-icon">📂</div>
-        <div class="drop-title">Open Engineering File</div>
-        <div class="drop-sub">Drag & drop or click Open File above</div>
-        <div class="drop-formats">
-          <span class="fmt-chip dwg">DWG</span>
-          <span class="fmt-chip nwd">NWD</span>
-          <span class="fmt-chip nwc">NWC</span>
+      <!-- DROP ZONE -->
+      <div id="DZ">
+        <div class="dzi">📂</div>
+        <div class="dzt">Open Engineering File</div>
+        <div class="dzs">Drag & drop or click <b>Open File</b></div>
+        <div class="dzc">
+          <span class="dzch dxf">DXF ✓ Renders</span>
+          <span class="dzch img">PNG/JPG ✓ Renders</span>
+          <span class="dzch pdf">PDF ✓ Renders</span>
+          <span class="dzch dwg">DWG/NWD</span>
+          <span class="dzch nwd">IFC/RVT</span>
         </div>
+        <div style="font-size:10.5px;color:var(--t3);margin-top:6px;font-family:var(--mono)">DXF · PNG · JPG · PDF render natively • DWG/NWD needs backend</div>
+      </div>
+
+      <!-- UNSUPPORTED FORMAT NOTICE -->
+      <div id="UNS">
+        <div class="uns-icon" id="unsIcon">🔧</div>
+        <div class="uns-title" id="unsTitle">File loaded — Backend required for full render</div>
+        <div class="uns-sub" id="unsSub">This format requires server-side conversion to render geometry.</div>
+        <div class="uns-note" id="unsNote"></div>
       </div>
 
       <!-- VIEW CUBE -->
-      <div class="view-cube" id="viewCube">
-        <div class="cube-face cube-top" onclick="setViewAngle('top')">TOP</div>
-        <div class="cube-face cube-front" onclick="setViewAngle('front')">FRONT</div>
-        <div class="cube-face cube-side" onclick="setViewAngle('side')">SIDE</div>
+      <div id="VC">
+        <div class="cf cf-t" onclick="setView('top')">TOP</div>
+        <div class="cf cf-f" onclick="setView('front')">FRONT</div>
+        <div class="cf cf-s" onclick="setView('side')">SIDE</div>
       </div>
 
       <!-- MINI MAP -->
-      <div class="mini-map" id="miniMap">
-        <div class="mini-map-label">OVERVIEW</div>
-        <canvas id="miniCanvas" width="120" height="90"></canvas>
-      </div>
+      <div id="MM"><div class="mml">OVERVIEW</div><canvas id="mc2" width="110" height="82"></canvas></div>
     </div>
 
-    <!-- STATUS BAR -->
-    <div class="status-bar">
-      <div class="status-item"><div class="status-dot"></div><span id="statusText">Ready</span></div>
-      <div class="status-item">Mode: <span id="modeDisplay">DWG Viewer</span></div>
-      <div class="status-item">Tool: <span id="toolDisplay">Select</span></div>
-      <div class="coord-display">
-        <div class="coord-item">X: <span id="coordX">0.00</span></div>
-        <div class="coord-item">Y: <span id="coordY">0.00</span></div>
-        <div class="coord-item">Z: <span id="coordZ">–</span></div>
-      </div>
-      <div class="status-item" style="margin-left:auto">FPS: <span id="fpsDisplay">60</span></div>
-      <div class="status-item">Scale: <span id="scaleDisplay">1:100</span></div>
+    <div id="SB">
+      <div class="si"><div class="sdt" id="sdt"></div><b id="sSt">Ready</b></div>
+      <div class="si">Mode:<b id="sMd">DWG</b></div>
+      <div class="si">Tool:<b id="sTl">Select</b></div>
+      <div class="si">X:<b id="sX">0.00</b></div>
+      <div class="si">Y:<b id="sY">0.00</b></div>
+      <div class="si" id="sZW" style="display:none">Z:<b id="sZ">0.00</b></div>
+      <div class="si" style="margin-left:auto">FPS:<b id="sFps">60</b></div>
+      <div class="si">Scale:<b id="sSc">1:100</b></div>
     </div>
   </div>
 
   <!-- RIGHT PANEL -->
-  <div class="right-panel">
-    <!-- CLASH VIEW -->
-    <div class="rpanel-header" id="rpanelTitle">
-      ⚠ Clash Detection
-      <span class="clash-badge" id="clashBadge">12</span>
-    </div>
-    <div class="rpanel-content" id="rightPanelContent"></div>
+  <div id="RP">
+    <div class="rph" id="rpH">⚠ Clash Detection <span class="cb" id="rpC">12</span></div>
+    <div class="sc" id="rpCt"></div>
   </div>
 </div>
 
 <!-- CONTEXT MENU -->
-<div class="ctx-menu" id="ctxMenu">
-  <div class="ctx-item" onclick="ctxAction('isolate')"><span class="icon">🔍</span>Isolate</div>
-  <div class="ctx-item" onclick="ctxAction('hide')"><span class="icon">👁</span>Hide</div>
-  <div class="ctx-item" onclick="ctxAction('color')"><span class="icon">🎨</span>Override Color</div>
-  <div class="ctx-sep"></div>
-  <div class="ctx-item" onclick="ctxAction('measure')"><span class="icon">📏</span>Measure from here</div>
-  <div class="ctx-item" onclick="ctxAction('properties')"><span class="icon">ℹ</span>Properties</div>
-  <div class="ctx-sep"></div>
-  <div class="ctx-item" onclick="ctxAction('copy-coords')"><span class="icon">📋</span>Copy Coordinates</div>
+<div id="CTX">
+  <div class="ci" onclick="ctxDo('isolate')">🔍 Isolate</div>
+  <div class="ci" onclick="ctxDo('hide')">👁 Hide</div>
+  <div class="ci" onclick="ctxDo('showall')">👀 Show All</div>
+  <div class="csep"></div>
+  <div class="ci" onclick="ctxDo('measure')">📏 Measure From Here</div>
+  <div class="ci" onclick="ctxDo('props')">ℹ Properties</div>
+  <div class="csep"></div>
+  <div class="ci" onclick="ctxDo('coords')">📋 Copy Coordinates</div>
+</div>
+
+<!-- UPLOAD MODAL -->
+<div id="UM">
+  <div class="umbox">
+    <div class="umt" id="umT">Processing…</div>
+    <div class="ums" id="umS">Please wait</div>
+    <div class="umb"><div class="umf" id="umF"></div></div>
+    <div class="umsteps">
+      <div class="umst" id="us1"><div class="umd"></div>Reading file</div>
+      <div class="umst" id="us2"><div class="umd"></div>Parsing geometry</div>
+      <div class="umst" id="us3"><div class="umd"></div>Building layer index</div>
+      <div class="umst" id="us4"><div class="umd"></div>Rendering to viewer</div>
+    </div>
+  </div>
 </div>
 
 <!-- TOAST -->
-<div class="toast" id="toast"></div>
+<div id="T"></div>
 
 <script>
-/* ===================== STATE ===================== */
-let state = {
-  mode: 'dwg',       // 'dwg' | 'nwd'
-  tool: 'select',
-  zoom: 100,
-  pan: { x: 0, y: 0 },
-  dragging: false,
-  lastMouse: { x: 0, y: 0 },
-  grid: true,
-  fileLoaded: false,
-  currentLayout: 'Model',
-  viewAngle: 'front',
-  mousePos: { x: 0, y: 0 },
-  viewHistory: [],
-  viewFuture: [],
-  measurePoints: [],
-  activeMeasure: null,
-  frame: 0,
-  fps: 60,
-  lastTime: performance.now()
+// ══════════════════════════════════════════════════════════
+//  CONFIG — pdf.js worker
+// ══════════════════════════════════════════════════════════
+if (typeof pdfjsLib !== 'undefined') {
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+
+// ══════════════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════════════
+const S = {
+  mode:'dwg', tool:'select',
+  zoom:100, pan:{x:0,y:0},
+  drag:false, lastM:{x:0,y:0},
+  grid:true, loaded:false,
+  fileType:null,      // 'dxf'|'image'|'pdf'|'dwg'|'unsupported'
+  // DXF parsed data
+  dxfData:null, dxfLayers:{}, dxfEntities:[],
+  dxfBounds:{minX:0,minY:0,maxX:1000,maxY:1000},
+  // Image data
+  imgBitmap:null,
+  // PDF data
+  pdfPages:[], pdfPageIdx:0,
+  // measure
+  mPts:[], frame:0, fps:60, lastT:performance.now(),
+  vHist:[{pan:{x:0,y:0},zoom:100}], vIdx:0,
+  mousePos:{x:0,y:0}
 };
 
-const layers = [
-  { name: '0', color: '#ffffff', visible: true },
-  { name: 'A-WALL', color: '#e05050', visible: true },
-  { name: 'A-DOOR', color: '#f08040', visible: true },
-  { name: 'A-WINDOW', color: '#e0b040', visible: true },
-  { name: 'S-BEAM', color: '#3ddc84', visible: true },
-  { name: 'S-COLUMN', color: '#00b4d8', visible: true },
-  { name: 'M-HVAC', color: '#1b8fe3', visible: true },
-  { name: 'E-POWER', color: '#a078e8', visible: true },
-  { name: 'P-PIPE', color: '#e060a0', visible: true },
-  { name: 'GRID', color: '#565d6e', visible: true },
-  { name: 'DIMS', color: '#8a909c', visible: true },
-  { name: 'TEXT', color: '#d4d8e0', visible: true },
+// ══════════════════════════════════════════════════════════
+//  LAYERS — dynamic (from DXF) + demo fallback
+// ══════════════════════════════════════════════════════════
+let LAYERS = [
+  {name:'0',        color:'#ffffff',visible:true},
+  {name:'A-WALL',   color:'#e05050',visible:true},
+  {name:'A-DOOR',   color:'#f08040',visible:true},
+  {name:'A-WINDOW', color:'#e0b040',visible:true},
+  {name:'S-BEAM',   color:'#3ddc84',visible:true},
+  {name:'S-COLUMN', color:'#00b4d8',visible:true},
+  {name:'M-HVAC',   color:'#1b8fe3',visible:true},
+  {name:'E-POWER',  color:'#a078e8',visible:true},
+  {name:'P-PIPE',   color:'#e060a0',visible:true},
+  {name:'GRID',     color:'#565d6e',visible:true},
+  {name:'DIMS',     color:'#8a909c',visible:true},
+  {name:'TEXT',     color:'#d4d8e0',visible:true},
 ];
 
-const modelTree = [
-  { id: 1, name: 'Site Model', icon: '🏗', indent: 0, open: true, children: [2,3,4] },
-  { id: 2, name: 'Level 01', icon: '📐', indent: 1, open: true, children: [5,6] },
-  { id: 5, name: 'Structural', icon: '🔩', indent: 2, open: false, children: [] },
-  { id: 6, name: 'Architecture', icon: '🏛', indent: 2, open: false, children: [] },
-  { id: 3, name: 'Level 02', icon: '📐', indent: 1, open: false, children: [] },
-  { id: 4, name: 'MEP', icon: '⚡', indent: 1, open: true, children: [7,8] },
-  { id: 7, name: 'HVAC Ducts', icon: '🌀', indent: 2, open: false, children: [] },
-  { id: 8, name: 'Pipework', icon: '🔧', indent: 2, open: false, children: [] },
+const TREE = [
+  {id:1,name:'Site Model',  icon:'🏗',indent:0},
+  {id:2,name:'Level 01',    icon:'📐',indent:1},
+  {id:5,name:'Structural',  icon:'🔩',indent:2},
+  {id:6,name:'Architecture',icon:'🏛',indent:2},
+  {id:3,name:'Level 02',    icon:'📐',indent:1},
+  {id:4,name:'MEP',         icon:'⚡',indent:1},
+  {id:7,name:'HVAC Ducts',  icon:'🌀',indent:2},
+  {id:8,name:'Pipework',    icon:'🔧',indent:2},
 ];
 
-const clashes = [
-  { id: 'CLH-001', desc: 'HVAC Duct vs Structural Beam', type: 'hard', dist: '−12mm' },
-  { id: 'CLH-002', desc: 'Pipe Clash with Column', type: 'hard', dist: '−5mm' },
-  { id: 'CLS-003', desc: 'Cable Tray Clearance', type: 'soft', dist: '+18mm' },
-  { id: 'CLS-004', desc: 'Duct to Duct Clearance', type: 'soft', dist: '+8mm' },
-  { id: 'CLD-005', desc: 'Duplicate Pipe Segment', type: 'dup', dist: '0mm' },
-  { id: 'CLH-006', desc: 'Sprinkler vs Beam Flange', type: 'hard', dist: '−3mm' },
-  { id: 'CLS-007', desc: 'HVAC Fan Clearance', type: 'soft', dist: '+25mm' },
-  { id: 'CLH-008', desc: 'Conduit through Slab', type: 'hard', dist: '−20mm' },
-  { id: 'CLS-009', desc: 'Pipe Hanger Clearance', type: 'soft', dist: '+10mm' },
-  { id: 'CLH-010', desc: 'Structural Connection Clash', type: 'hard', dist: '−7mm' },
-  { id: 'CLD-011', desc: 'Duplicate Wall Element', type: 'dup', dist: '0mm' },
-  { id: 'CLH-012', desc: 'Foundation vs Utility Pipe', type: 'hard', dist: '−35mm' },
+const CLASHES = [
+  {id:'CLH-001',desc:'HVAC Duct vs Structural Beam',type:'hard',dist:'-12mm'},
+  {id:'CLH-002',desc:'Pipe Clash with Column',       type:'hard',dist:'-5mm'},
+  {id:'CLS-003',desc:'Cable Tray Clearance',         type:'soft',dist:'+18mm'},
+  {id:'CLS-004',desc:'Duct to Duct Clearance',       type:'soft',dist:'+8mm'},
+  {id:'CLD-005',desc:'Duplicate Pipe Segment',       type:'dup', dist:'0mm'},
+  {id:'CLH-006',desc:'Sprinkler vs Beam Flange',     type:'hard',dist:'-3mm'},
+  {id:'CLS-007',desc:'HVAC Fan Clearance',           type:'soft',dist:'+25mm'},
+  {id:'CLH-008',desc:'Conduit through Slab',         type:'hard',dist:'-20mm'},
+  {id:'CLS-009',desc:'Pipe Hanger Clearance',        type:'soft',dist:'+10mm'},
+  {id:'CLH-010',desc:'Structural Connection Clash',  type:'hard',dist:'-7mm'},
+  {id:'CLD-011',desc:'Duplicate Wall Element',       type:'dup', dist:'0mm'},
+  {id:'CLH-012',desc:'Foundation vs Utility Pipe',  type:'hard',dist:'-35mm'},
 ];
 
-/* ===================== INIT ===================== */
-window.addEventListener('load', () => {
-  // Simulate loading sequence
-  const messages = [
-    'Initializing WebGL renderer...',
-    'Loading geometry engine...',
-    'Building shader programs...',
-    'Setting up layer system...',
-    'Ready'
-  ];
-  let i = 0;
-  const lt = document.getElementById('loaderText');
-  const interval = setInterval(() => {
-    if (i < messages.length) lt.textContent = messages[i++];
-    else clearInterval(interval);
-  }, 480);
+// DXF color index → hex (basic ACI palette)
+const ACI = {
+  0:'#000000',1:'#ff0000',2:'#ffff00',3:'#00ff00',4:'#00ffff',
+  5:'#0000ff',6:'#ff00ff',7:'#ffffff',8:'#808080',9:'#c0c0c0',
+  10:'#ff0000',30:'#ff8000',40:'#ffbf00',50:'#ffff00',
+  70:'#80ff00',90:'#00ff00',130:'#00ff80',150:'#00ffff',
+  170:'#0080ff',190:'#0000ff',210:'#8000ff',230:'#ff00ff',
+  250:'#888888',251:'#aaaaaa',252:'#cccccc',253:'#dddddd',254:'#eeeeee',255:'#ffffff'
+};
+function aciColor(n){ return ACI[n] || '#888888'; }
 
-  setTimeout(() => {
-    document.getElementById('loadingOverlay').classList.add('hidden');
-    initUI();
-    resizeCanvas();
-    renderLoop();
-  }, 2600);
-
-  window.addEventListener('resize', resizeCanvas);
-  document.addEventListener('click', () => document.getElementById('ctxMenu').classList.remove('show'));
+// ══════════════════════════════════════════════════════════
+//  BOOT
+// ══════════════════════════════════════════════════════════
+const LMSGS = ['Initializing WebGL renderer…','Loading geometry engine…','Building shader programs…','Setting up layer index…','Ready'];
+window.addEventListener('load',()=>{
+  let i=0;
+  const fill=document.getElementById('lsf'), msg=document.getElementById('lsm');
+  const pcts=[0,22,45,70,90];
+  const tick=()=>{ if(i<LMSGS.length){msg.textContent=LMSGS[i];fill.style.width=pcts[i]+'%';i++;setTimeout(tick,480);} };
+  tick();
+  setTimeout(()=>{
+    fill.style.width='100%';
+    setTimeout(()=>{ document.getElementById('ls').classList.add('out'); initAll(); },400);
+  }, 2500);
+  window.addEventListener('resize', resizeCv);
+  document.addEventListener('click',()=>document.getElementById('CTX').classList.remove('show'));
 });
 
-function initUI() {
-  buildLayers();
-  buildModelTree();
-  buildProperties();
-  buildClashPanel();
-  buildSectionPanel();
+function initAll(){
+  resizeCv(); buildLL(); buildMT(); buildClash(); buildSection();
+  // Pre-load demo
+  S.loaded=true; S.fileType='demo';
+  document.getElementById('DZ').classList.add('h');
+  document.getElementById('fcn').textContent='GroundFloor_RevA3.dwg (demo)';
+  updateProps_demo();
+  renderLoop();
 }
 
-/* ===================== CANVAS ===================== */
-function resizeCanvas() {
-  const ca = document.getElementById('canvasArea');
-  const cv = document.getElementById('viewer');
-  cv.width = ca.clientWidth;
-  cv.height = ca.clientHeight;
+// ══════════════════════════════════════════════════════════
+//  CANVAS
+// ══════════════════════════════════════════════════════════
+function resizeCv(){
+  const w=document.getElementById('CW');
+  const c=document.getElementById('MC');
+  c.width=w.clientWidth; c.height=w.clientHeight;
 }
 
-let _raf;
-function renderLoop() {
-  const now = performance.now();
-  const dt = now - state.lastTime;
-  state.lastTime = now;
-  state.fps = Math.round(1000 / dt);
-  document.getElementById('fpsDisplay').textContent = Math.min(60, state.fps);
-
-  draw();
-  _raf = requestAnimationFrame(renderLoop);
+function renderLoop(){
+  const now=performance.now(); const dt=now-S.lastT; S.lastT=now;
+  S.fps=Math.round(1000/Math.max(dt,1));
+  document.getElementById('sFps').textContent=Math.min(60,S.fps);
+  draw(); requestAnimationFrame(renderLoop); S.frame++;
 }
 
-function draw() {
-  const cv = document.getElementById('viewer');
-  const ctx = cv.getContext('2d');
-  const W = cv.width, H = cv.height;
-  if (!W || !H) return;
+// ══════════════════════════════════════════════════════════
+//  DRAW DISPATCHER
+// ══════════════════════════════════════════════════════════
+function draw(){
+  const cv=document.getElementById('MC');
+  const ctx=cv.getContext('2d');
+  const W=cv.width,H=cv.height;
+  if(!W||!H) return;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#0d0f12'; ctx.fillRect(0,0,W,H);
 
-  ctx.clearRect(0, 0, W, H);
+  if(!S.loaded){ drawGrid(ctx,W,H); return; }
 
-  if (!state.fileLoaded) {
-    drawBackground(ctx, W, H);
+  if(S.fileType==='image' && S.imgBitmap){
+    drawImageFile(ctx,W,H);
+    if(S.grid) drawGridOverlay(ctx,W,H);
+    drawMeasOverlay(ctx,W,H);
+    drawMiniMap();
     return;
   }
 
-  ctx.save();
-  ctx.translate(state.pan.x + W/2, state.pan.y + H/2);
-  ctx.scale(state.zoom/100, state.zoom/100);
-
-  drawBackground(ctx, W, H);
-
-  if (state.mode === 'dwg') {
-    drawDWG(ctx, W, H);
-  } else {
-    draw3DModel(ctx, W, H);
+  if(S.fileType==='pdf' && S.pdfPages.length){
+    drawPdfPage(ctx,W,H);
+    if(S.grid) drawGridOverlay(ctx,W,H);
+    drawMeasOverlay(ctx,W,H);
+    drawMiniMap();
+    return;
   }
 
-  ctx.restore();
+  if(S.fileType==='dxf' && S.dxfEntities.length){
+    ctx.save();
+    ctx.translate(S.pan.x+W/2, S.pan.y+H/2);
+    ctx.scale(S.zoom/100, S.zoom/100);
+    if(S.grid) drawGrid(ctx,W,H);
+    drawDXF(ctx,W,H);
+    ctx.restore();
+    drawMeasOverlay(ctx,W,H);
+    drawMiniMap();
+    return;
+  }
 
-  drawMeasureOverlay(ctx, W, H);
+  // Demo / DWG placeholder
+  ctx.save();
+  ctx.translate(S.pan.x+W/2, S.pan.y+H/2);
+  ctx.scale(S.zoom/100, S.zoom/100);
+  if(S.grid) drawGrid(ctx,W,H);
+  if(S.mode==='dwg') drawDemo(ctx);
+  else draw3D(ctx);
+  ctx.restore();
+  drawMeasOverlay(ctx,W,H);
   drawMiniMap();
-  state.frame++;
 }
 
-function drawBackground(ctx, W, H) {
-  // dark grid background
-  if (!state.fileLoaded) {
-    ctx.fillStyle = '#0d0f12';
-    ctx.fillRect(0, 0, W, H);
-  }
-  if (state.grid) {
-    const gridSize = 40 * (state.zoom/100);
-    const ox = (state.pan.x + W/2) % gridSize;
-    const oy = (state.pan.y + H/2) % gridSize;
-    ctx.strokeStyle = 'rgba(50,55,65,0.6)';
-    ctx.lineWidth = 0.5;
-    ctx.beginPath();
-    for (let x = ox - gridSize; x < W + gridSize; x += gridSize) {
-      ctx.moveTo(x, 0); ctx.lineTo(x, H);
-    }
-    for (let y = oy - gridSize; y < H + gridSize; y += gridSize) {
-      ctx.moveTo(0, y); ctx.lineTo(W, y);
-    }
-    ctx.stroke();
-
-    // Major grid
-    const maj = gridSize * 5;
-    const mox = (state.pan.x + W/2) % maj;
-    const moy = (state.pan.y + H/2) % maj;
-    ctx.strokeStyle = 'rgba(60,66,80,0.5)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    for (let x = mox - maj; x < W + maj; x += maj) {
-      ctx.moveTo(x, 0); ctx.lineTo(x, H);
-    }
-    for (let y = moy - maj; y < H + maj; y += maj) {
-      ctx.moveTo(0, y); ctx.lineTo(W, y);
-    }
-    ctx.stroke();
-  }
+// ── GRID ──────────────────────────────────────────────────
+function drawGrid(ctx,W,H){
+  const gs=40*(S.zoom/100);
+  const ox=(S.pan.x+W/2)%gs, oy=(S.pan.y+H/2)%gs;
+  ctx.strokeStyle='rgba(50,55,65,0.5)'; ctx.lineWidth=0.5;
+  ctx.beginPath();
+  for(let x=ox-gs;x<W+gs;x+=gs){ctx.moveTo(x,0);ctx.lineTo(x,H);}
+  for(let y=oy-gs;y<H+gs;y+=gs){ctx.moveTo(0,y);ctx.lineTo(W,y);}
+  ctx.stroke();
+  const maj=gs*5, mox=(S.pan.x+W/2)%maj, moy=(S.pan.y+H/2)%maj;
+  ctx.strokeStyle='rgba(62,68,82,0.45)'; ctx.lineWidth=1; ctx.beginPath();
+  for(let x=mox-maj;x<W+maj;x+=maj){ctx.moveTo(x,0);ctx.lineTo(x,H);}
+  for(let y=moy-maj;y<H+maj;y+=maj){ctx.moveTo(0,y);ctx.lineTo(W,y);}
+  ctx.stroke();
 }
 
-function drawDWG(ctx, W, H) {
-  const t = state.frame * 0.002;
-  const vis = {};
-  layers.forEach(l => vis[l.name] = l.visible);
+function drawGridOverlay(ctx,W,H){
+  // Grid over image/pdf at fixed screen coords
+  ctx.strokeStyle='rgba(50,55,65,0.35)'; ctx.lineWidth=0.5;
+  const gs=40; ctx.beginPath();
+  for(let x=0;x<W;x+=gs){ctx.moveTo(x,0);ctx.lineTo(x,H);}
+  for(let y=0;y<H;y+=gs){ctx.moveTo(0,y);ctx.lineTo(W,y);}
+  ctx.stroke();
+}
 
-  // Building outline
-  if (vis['A-WALL']) {
-    ctx.strokeStyle = '#e05050';
-    ctx.lineWidth = 2.5 / (state.zoom/100);
+// ── IMAGE ─────────────────────────────────────────────────
+function drawImageFile(ctx,W,H){
+  const bmp=S.imgBitmap;
+  const sc=S.zoom/100;
+  const iw=bmp.width*sc, ih=bmp.height*sc;
+  const x=S.pan.x+W/2-iw/2, y=S.pan.y+H/2-ih/2;
+  // Dark background border
+  ctx.fillStyle='#1a1d21';
+  ctx.fillRect(x-2,y-2,iw+4,ih+4);
+  ctx.drawImage(bmp,x,y,iw,ih);
+  // Thin border
+  ctx.strokeStyle='rgba(54,59,68,.6)'; ctx.lineWidth=1;
+  ctx.strokeRect(x,y,iw,ih);
+}
+
+// ── PDF ───────────────────────────────────────────────────
+function drawPdfPage(ctx,W,H){
+  const pg=S.pdfPages[S.pdfPageIdx];
+  if(!pg) return;
+  const sc=S.zoom/100;
+  const iw=pg.width*sc, ih=pg.height*sc;
+  const x=S.pan.x+W/2-iw/2, y=S.pan.y+H/2-ih/2;
+  ctx.fillStyle='#ffffff'; ctx.fillRect(x,y,iw,ih);
+  ctx.drawImage(pg.canvas,x,y,iw,ih);
+  ctx.strokeStyle='rgba(54,59,68,.6)'; ctx.lineWidth=1; ctx.strokeRect(x,y,iw,ih);
+}
+
+// ══════════════════════════════════════════════════════════
+//  DXF RENDERER — reads real parsed DXF entities
+// ══════════════════════════════════════════════════════════
+function drawDXF(ctx,W,H){
+  const z=S.zoom/100;
+  const {minX,minY,maxX,maxY}=S.dxfBounds;
+  const scaleX=(maxX-minX)||1000, scaleY=(maxY-minY)||1000;
+
+  // World→screen transform (centered, Y-flipped)
+  const toSX = wx => (wx - minX - scaleX/2);
+  const toSY = wy => -(wy - minY - scaleY/2);
+
+  // Group entities by layer, filter hidden layers
+  const hiddenLayers = new Set(LAYERS.filter(l=>!l.visible).map(l=>l.name));
+
+  S.dxfEntities.forEach(e => {
+    const layerName = (e.layer||'0').toUpperCase();
+    if(hiddenLayers.has(layerName)) return;
+
+    // Get color: entity color > layer color > default
+    const layerDef = S.dxfLayers[layerName];
+    let color = '#aaaaaa';
+    if(e.colorIndex && e.colorIndex!==256) color = aciColor(e.colorIndex);
+    else if(layerDef && layerDef.color) color = aciColor(layerDef.color);
+
+    ctx.strokeStyle = color;
+    ctx.fillStyle   = color;
+    ctx.lineWidth   = (e.lineweight||1)/z;
+
+    try {
+      switch(e.type){
+        case 'LINE':
+          ctx.beginPath();
+          ctx.moveTo(toSX(e.vertices[0].x), toSY(e.vertices[0].y));
+          ctx.lineTo(toSX(e.vertices[1].x), toSY(e.vertices[1].y));
+          ctx.stroke(); break;
+
+        case 'LWPOLYLINE':
+        case 'POLYLINE': {
+          if(!e.vertices||e.vertices.length<2) break;
+          ctx.beginPath();
+          ctx.moveTo(toSX(e.vertices[0].x), toSY(e.vertices[0].y));
+          for(let i=1;i<e.vertices.length;i++){
+            ctx.lineTo(toSX(e.vertices[i].x), toSY(e.vertices[i].y));
+          }
+          if(e.shape) ctx.closePath();
+          ctx.stroke(); break;
+        }
+
+        case 'CIRCLE':
+          ctx.beginPath();
+          ctx.arc(toSX(e.center.x), toSY(e.center.y), e.radius/z*z, 0, Math.PI*2);
+          ctx.stroke(); break;
+
+        case 'ARC': {
+          const sa = e.startAngle*Math.PI/180;
+          const ea = e.endAngle*Math.PI/180;
+          ctx.beginPath();
+          ctx.arc(toSX(e.center.x), toSY(e.center.y), e.radius, -ea, -sa);
+          ctx.stroke(); break;
+        }
+
+        case 'ELLIPSE': {
+          const cx=toSX(e.center.x), cy=toSY(e.center.y);
+          const rx=Math.sqrt(e.majorAxisEndPoint.x**2+e.majorAxisEndPoint.y**2);
+          const ry=rx*e.axisRatio;
+          ctx.beginPath();
+          ctx.ellipse(cx,cy,rx,ry,0,0,Math.PI*2);
+          ctx.stroke(); break;
+        }
+
+        case 'TEXT':
+        case 'MTEXT': {
+          const tx=toSX(e.startPoint.x), ty=toSY(e.startPoint.y);
+          const fs=Math.max(8,(e.textHeight||2.5))*0.8/z*z;
+          ctx.font=`${fs}px IBM Plex Sans`;
+          ctx.fillStyle=color;
+          ctx.textAlign='left';
+          const txt=(e.text||e.string||'').replace(/\\P/g,' ').replace(/\{[^}]*\}/g,'').replace(/\\/g,'');
+          ctx.fillText(txt.substring(0,80),tx,ty);
+          break;
+        }
+
+        case 'SPLINE': {
+          if(!e.controlPoints||e.controlPoints.length<2) break;
+          ctx.beginPath();
+          ctx.moveTo(toSX(e.controlPoints[0].x),toSY(e.controlPoints[0].y));
+          for(let i=1;i<e.controlPoints.length;i++){
+            ctx.lineTo(toSX(e.controlPoints[i].x),toSY(e.controlPoints[i].y));
+          }
+          ctx.stroke(); break;
+        }
+
+        case 'SOLID':
+        case 'TRACE': {
+          if(!e.corners||e.corners.length<3) break;
+          ctx.beginPath();
+          ctx.moveTo(toSX(e.corners[0].x),toSY(e.corners[0].y));
+          e.corners.forEach(c=>ctx.lineTo(toSX(c.x),toSY(c.y)));
+          ctx.closePath(); ctx.fill(); break;
+        }
+
+        case 'POINT': {
+          const px=toSX(e.position.x), py=toSY(e.position.y);
+          ctx.beginPath(); ctx.arc(px,py,2/z*z,0,Math.PI*2);
+          ctx.fill(); break;
+        }
+
+        case 'INSERT': {
+          // Block references — draw a small marker
+          const bx=toSX(e.position.x), by=toSY(e.position.y);
+          ctx.beginPath(); ctx.rect(bx-3/z*z,by-3/z*z,6/z*z,6/z*z);
+          ctx.strokeStyle='rgba(180,180,180,0.4)'; ctx.stroke();
+          break;
+        }
+      }
+    } catch(err){}
+  });
+}
+
+// ── DEMO DRAWING (when no real DXF loaded) ────────────────
+function drawDemo(ctx){
+  const vis={};
+  LAYERS.forEach(l=>vis[l.name]=l.visible);
+  const z=S.zoom/100;
+
+  if(vis['A-WALL']){
+    ctx.strokeStyle='#e05050'; ctx.lineWidth=2.5/z;
     ctx.beginPath();
-    const walls = [[-320,-200,320,-200],[320,-200,320,200],
-                   [320,200,-320,200],[-320,200,-320,-200],
-                   [-80,-200,-80,50],[80,-200,80,50],
-                   [-320,-50,80,-50],[-320,80,80,80]];
-    walls.forEach(([x1,y1,x2,y2]) => {
-      ctx.moveTo(x1,y1); ctx.lineTo(x2,y2);
-    });
+    [[-320,-200,320,-200],[320,-200,320,200],[320,200,-320,200],[-320,200,-320,-200],
+     [-80,-200,-80,50],[80,-200,80,50],[-320,-50,80,-50],[-320,80,80,80]
+    ].forEach(([x1,y1,x2,y2])=>{ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);});
     ctx.stroke();
-
-    // Inner rooms
     ctx.beginPath();
-    ctx.rect(-280,-160,160,100);
-    ctx.rect(-280,20,160,140);
-    ctx.rect(50,-160,230,100);
-    ctx.rect(50,20,230,140);
+    ctx.rect(-280,-160,160,100);ctx.rect(-280,20,160,140);
+    ctx.rect(50,-160,230,100);ctx.rect(50,20,230,140);
     ctx.stroke();
   }
-
-  // Doors
-  if (vis['A-DOOR']) {
-    ctx.strokeStyle = '#f08040';
-    ctx.lineWidth = 1.5 / (state.zoom/100);
-    [[-80,-50,40,0],[80,-50,40,0],[-80,80,40,0]].forEach(([x,y,r,a]) => {
-      ctx.save();
-      ctx.translate(x,y);
-      ctx.beginPath();
-      ctx.moveTo(0,0); ctx.lineTo(r,0);
-      ctx.arc(0,0,r,0,Math.PI/2);
-      ctx.stroke();
-      ctx.restore();
+  if(vis['A-DOOR']){
+    ctx.strokeStyle='#f08040';ctx.lineWidth=1.5/z;
+    [[-80,-50,40],[80,-50,40],[-80,80,40]].forEach(([x,y,r])=>{
+      ctx.save();ctx.translate(x,y);ctx.beginPath();
+      ctx.moveTo(0,0);ctx.lineTo(r,0);ctx.arc(0,0,r,0,Math.PI/2);ctx.stroke();ctx.restore();
     });
   }
-
-  // Windows
-  if (vis['A-WINDOW']) {
-    ctx.strokeStyle = '#e0b040';
-    ctx.lineWidth = 1.5 / (state.zoom/100);
-    [[-200,-200,60,0],[-60,-200,60,0],[150,-200,80,0],
-     [-320,-120,0,60],[-320,0,0,60],[320,-120,0,60]].forEach(([x,y,w,h]) => {
-      ctx.beginPath();
-      ctx.rect(x - w/2, y - h/2, w || 6, h || 6);
-      ctx.stroke();
+  if(vis['A-WINDOW']){
+    ctx.strokeStyle='#e0b040';ctx.lineWidth=1.5/z;
+    [[-200,-200,60,6],[-60,-200,60,6],[150,-200,80,6],[-320,-120,6,60],[-320,0,6,60],[320,-120,6,60]].forEach(([x,y,w,h])=>{
+      ctx.beginPath();ctx.rect(x-w/2,y-h/2,w,h);ctx.stroke();
     });
   }
-
-  // Structural
-  if (vis['S-COLUMN']) {
-    ctx.fillStyle = 'rgba(61,220,132,0.6)';
-    ctx.strokeStyle = '#3ddc84';
-    ctx.lineWidth = 1.5 / (state.zoom/100);
-    [[-320,-200],[0,-200],[320,-200],[-320,0],[0,0],[320,0],[-320,200],[0,200],[320,200]].forEach(([x,y]) => {
-      ctx.beginPath(); ctx.rect(x-10,y-10,20,20); ctx.fill(); ctx.stroke();
+  if(vis['S-COLUMN']){
+    ctx.fillStyle='rgba(61,220,132,0.55)';ctx.strokeStyle='#3ddc84';ctx.lineWidth=1.5/z;
+    [[-320,-200],[0,-200],[320,-200],[-320,0],[0,0],[320,0],[-320,200],[0,200],[320,200]].forEach(([x,y])=>{
+      ctx.beginPath();ctx.rect(x-10,y-10,20,20);ctx.fill();ctx.stroke();
     });
   }
-
-  if (vis['S-BEAM']) {
-    ctx.strokeStyle = '#3ddc84';
-    ctx.lineWidth = 1 / (state.zoom/100);
-    ctx.setLineDash([8,4]);
-    for (let x = -320; x <= 320; x += 160) {
-      ctx.beginPath(); ctx.moveTo(x,-200); ctx.lineTo(x,200); ctx.stroke();
-    }
-    for (let y = -200; y <= 200; y += 100) {
-      ctx.beginPath(); ctx.moveTo(-320,y); ctx.lineTo(320,y); ctx.stroke();
+  if(vis['S-BEAM']){
+    ctx.strokeStyle='#3ddc84';ctx.lineWidth=1/z;ctx.setLineDash([8,4]);
+    for(let x=-320;x<=320;x+=160){ctx.beginPath();ctx.moveTo(x,-200);ctx.lineTo(x,200);ctx.stroke();}
+    for(let y=-200;y<=200;y+=100){ctx.beginPath();ctx.moveTo(-320,y);ctx.lineTo(320,y);ctx.stroke();}
+    ctx.setLineDash([]);
+  }
+  if(vis['M-HVAC']){
+    ctx.strokeStyle='rgba(27,143,227,0.75)';ctx.lineWidth=4/z;
+    ctx.beginPath();ctx.moveTo(-280,-130);ctx.lineTo(280,-130);ctx.moveTo(0,-130);ctx.lineTo(0,130);ctx.moveTo(-280,130);ctx.lineTo(280,130);ctx.stroke();
+  }
+  if(vis['P-PIPE']){
+    ctx.strokeStyle='rgba(224,96,160,0.75)';ctx.lineWidth=2/z;
+    ctx.beginPath();ctx.moveTo(-260,-160);ctx.lineTo(-260,160);ctx.moveTo(260,-160);ctx.lineTo(260,160);ctx.moveTo(-260,0);ctx.lineTo(260,0);ctx.stroke();
+  }
+  if(vis['E-POWER']){
+    ctx.strokeStyle='rgba(160,120,232,0.6)';ctx.lineWidth=1.5/z;ctx.setLineDash([6,3]);
+    ctx.beginPath();ctx.moveTo(-300,160);ctx.lineTo(300,160);ctx.moveTo(-300,-160);ctx.lineTo(300,-160);ctx.stroke();ctx.setLineDash([]);
+  }
+  if(vis['GRID']){
+    ctx.strokeStyle='rgba(100,110,130,0.4)';ctx.lineWidth=0.5/z;ctx.setLineDash([4,8]);
+    ['A','B','C','D','E'].forEach((l,i)=>{
+      const x=-320+i*160;
+      ctx.beginPath();ctx.moveTo(x,-245);ctx.lineTo(x,245);ctx.stroke();
+      ctx.fillStyle='rgba(140,150,170,0.75)';ctx.font=`${12/z}px IBM Plex Mono`;ctx.textAlign='center';ctx.fillText(l,x,-252);
+    });
+    for(let i=0;i<=4;i++){
+      const y=-200+i*100;
+      ctx.beginPath();ctx.moveTo(-365,y);ctx.lineTo(365,y);ctx.stroke();
+      ctx.font=`${12/z}px IBM Plex Mono`;ctx.textAlign='right';ctx.fillText(i+1,-372,y+4);
     }
     ctx.setLineDash([]);
   }
-
-  // MEP
-  if (vis['M-HVAC']) {
-    ctx.strokeStyle = 'rgba(27,143,227,0.7)';
-    ctx.lineWidth = 4 / (state.zoom/100);
-    ctx.beginPath();
-    ctx.moveTo(-280, -130); ctx.lineTo(280, -130);
-    ctx.moveTo(0, -130); ctx.lineTo(0, 130);
-    ctx.moveTo(-280, 130); ctx.lineTo(280, 130);
-    ctx.stroke();
+  if(vis['DIMS']){
+    ctx.strokeStyle='rgba(138,144,156,0.7)';ctx.fillStyle='rgba(138,144,156,0.9)';ctx.lineWidth=0.7/z;
+    ctx.font=`${10/z}px IBM Plex Mono`;ctx.textAlign='center';
+    ctx.beginPath();ctx.moveTo(-320,-228);ctx.lineTo(320,-228);ctx.moveTo(-320,-228);ctx.lineTo(-320,-200);ctx.moveTo(320,-228);ctx.lineTo(320,-200);ctx.stroke();
+    ctx.fillText('64.00 m',0,-233);
+    ctx.beginPath();ctx.moveTo(348,-200);ctx.lineTo(348,200);ctx.moveTo(348,-200);ctx.lineTo(320,-200);ctx.moveTo(348,200);ctx.lineTo(320,200);ctx.stroke();
+    ctx.save();ctx.translate(358,0);ctx.rotate(-Math.PI/2);ctx.fillText('40.00 m',0,0);ctx.restore();
   }
-
-  if (vis['P-PIPE']) {
-    ctx.strokeStyle = 'rgba(224,96,160,0.7)';
-    ctx.lineWidth = 2 / (state.zoom/100);
-    ctx.beginPath();
-    ctx.moveTo(-260, -160); ctx.lineTo(-260, 160);
-    ctx.moveTo(260, -160); ctx.lineTo(260, 160);
-    ctx.moveTo(-260, 0); ctx.lineTo(260, 0);
-    ctx.stroke();
-  }
-
-  // Grid lines
-  if (vis['GRID']) {
-    ctx.strokeStyle = 'rgba(100,110,130,0.5)';
-    ctx.lineWidth = 0.5 / (state.zoom/100);
-    ctx.setLineDash([4,8]);
-    for (let x = -320; x <= 320; x += 160) {
-      ctx.beginPath(); ctx.moveTo(x,-230); ctx.lineTo(x,230); ctx.stroke();
-      ctx.fillStyle = 'rgba(140,150,170,0.8)';
-      ctx.font = `${12/(state.zoom/100)}px IBM Plex Mono`;
-      ctx.textAlign = 'center';
-      ctx.fillText(String.fromCharCode(65 + (x+320)/160), x, -245);
-    }
-    for (let y = -200; y <= 200; y += 100) {
-      ctx.beginPath(); ctx.moveTo(-350,y); ctx.lineTo(350,y); ctx.stroke();
-      ctx.font = `${12/(state.zoom/100)}px IBM Plex Mono`;
-      ctx.textAlign = 'right';
-      ctx.fillText(((-y+200)/100+1).toString(), -360, y+4);
-    }
-    ctx.setLineDash([]);
-  }
-
-  // Dimensions
-  if (vis['DIMS']) {
-    ctx.strokeStyle = 'rgba(138,144,156,0.7)';
-    ctx.fillStyle = 'rgba(138,144,156,0.9)';
-    ctx.lineWidth = 0.7 / (state.zoom/100);
-    ctx.font = `${10/(state.zoom/100)}px IBM Plex Mono`;
-    ctx.textAlign = 'center';
-
-    // Top dim
-    ctx.beginPath(); ctx.moveTo(-320,-220); ctx.lineTo(320,-220); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(-320,-220); ctx.lineTo(-320,-200); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(320,-220); ctx.lineTo(320,-200); ctx.stroke();
-    ctx.fillText('64.00 m', 0, -225);
-
-    // Side dim
-    ctx.beginPath(); ctx.moveTo(340,-200); ctx.lineTo(340,200); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(340,-200); ctx.lineTo(320,-200); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(340,200); ctx.lineTo(320,200); ctx.stroke();
-    ctx.save(); ctx.translate(350,0); ctx.rotate(-Math.PI/2); ctx.fillText('40.00 m',0,0); ctx.restore();
-  }
-
-  // Text labels
-  if (vis['TEXT']) {
-    ctx.fillStyle = 'rgba(212,216,224,0.8)';
-    ctx.font = `bold ${14/(state.zoom/100)}px IBM Plex Sans`;
-    ctx.textAlign = 'center';
-    ctx.fillText('GROUND FLOOR PLAN', 0, -175);
-    ctx.font = `${10/(state.zoom/100)}px IBM Plex Mono`;
-    ctx.fillStyle = 'rgba(138,144,156,0.6)';
-    ctx.fillText('Scale 1:100   |   Rev A.3', 0, 220);
+  if(vis['TEXT']){
+    ctx.fillStyle='rgba(212,216,224,0.85)';ctx.font=`bold ${15/z}px IBM Plex Sans`;ctx.textAlign='center';
+    ctx.fillText('GROUND FLOOR PLAN',0,-178);
+    ctx.font=`${10/z}px IBM Plex Mono`;ctx.fillStyle='rgba(138,144,156,0.6)';
+    ctx.fillText('Scale 1:100  |  Rev A.3',0,228);
   }
 }
 
-function draw3DModel(ctx, W, H) {
-  const t = state.frame * 0.005;
-
-  // Isometric-style 3D building wireframe
-  const iso = (x, y, z) => {
-    const angle = 0.5;
-    return {
-      sx: (x - z) * Math.cos(angle),
-      sy: (x + z) * Math.sin(angle) * 0.5 - y
-    };
-  };
-
-  const drawBox = (x0, y0, z0, x1, y1, z1, color, fill) => {
-    const corners = [
-      iso(x0,y0,z0), iso(x1,y0,z0), iso(x1,y0,z1), iso(x0,y0,z1),
-      iso(x0,y1,z0), iso(x1,y1,z0), iso(x1,y1,z1), iso(x0,y1,z1)
-    ];
-
-    const faces = [
-      [4,5,6,7], // top
-      [0,1,5,4], // front
-      [1,2,6,5], // right
-    ];
-
-    const colors = [
-      fill || 'rgba(27,143,227,0.15)',
-      'rgba(27,143,227,0.08)',
-      'rgba(27,143,227,0.05)'
-    ];
-
-    faces.forEach((f, fi) => {
-      ctx.beginPath();
-      ctx.moveTo(corners[f[0]].sx, corners[f[0]].sy);
-      f.slice(1).forEach(i => ctx.lineTo(corners[i].sx, corners[i].sy));
+function draw3D(ctx){
+  const t=S.frame*0.006;
+  const iso=(x,y,z)=>({sx:(x-z)*Math.cos(0.5),sy:(x+z)*Math.sin(0.5)*0.5-y});
+  const box=(x0,y0,z0,x1,y1,z1,col,fill)=>{
+    const c=[iso(x0,y0,z0),iso(x1,y0,z0),iso(x1,y0,z1),iso(x0,y0,z1),
+             iso(x0,y1,z0),iso(x1,y1,z0),iso(x1,y1,z1),iso(x0,y1,z1)];
+    [[4,5,6,7],[0,1,5,4],[1,2,6,5]].forEach((f,fi)=>{
+      ctx.beginPath();ctx.moveTo(c[f[0]].sx,c[f[0]].sy);
+      f.slice(1).forEach(i=>ctx.lineTo(c[i].sx,c[i].sy));
       ctx.closePath();
-      ctx.fillStyle = colors[fi];
-      ctx.fill();
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 1 / (state.zoom/100);
-      ctx.stroke();
+      ctx.fillStyle=fi===0?(fill||'rgba(27,143,227,.15)'):fi===1?'rgba(27,143,227,.07)':'rgba(27,143,227,.04)';
+      ctx.fill();ctx.strokeStyle=col;ctx.lineWidth=1/(S.zoom/100);ctx.stroke();
     });
   };
-
-  // Main structure
-  drawBox(-280,-240,-200,280,0,200,'rgba(27,143,227,0.6)');
-  // Level 2
-  drawBox(-240,-480,-160,240,-240,160,'rgba(61,220,132,0.4)','rgba(61,220,132,0.08)');
-  // Roof
-  drawBox(-260,-510,-180,260,-480,180,'rgba(224,176,64,0.4)','rgba(224,176,64,0.06)');
-
-  // Columns
-  [[-250,-240,-180],[-250,-240,180],[250,-240,-180],[250,-240,180],
-   [0,-240,-180],[0,-240,180]].forEach(([x,y,z]) => {
-    drawBox(x-12,y,z-12,x+12,-480,z+12,'rgba(61,220,132,0.7)','rgba(61,220,132,0.15)');
+  box(-280,-240,-200,280,0,200,'rgba(27,143,227,.6)');
+  box(-240,-480,-160,240,-240,160,'rgba(61,220,132,.4)','rgba(61,220,132,.08)');
+  box(-260,-510,-180,260,-480,180,'rgba(224,176,64,.4)','rgba(224,176,64,.06)');
+  [[-250,-240,-180],[-250,-240,180],[250,-240,-180],[250,-240,180],[0,-240,-180],[0,-240,180]].forEach(([x,y,z])=>{
+    box(x-12,y,z-12,x+12,-480,z+12,'rgba(61,220,132,.7)','rgba(61,220,132,.15)');
   });
-
-  // HVAC ducts
-  ctx.strokeStyle = 'rgba(27,143,227,0.8)';
-  ctx.lineWidth = 4 / (state.zoom/100);
-  ctx.beginPath();
-  const d1 = iso(-260,-120,0), d2 = iso(260,-120,0);
-  ctx.moveTo(d1.sx, d1.sy); ctx.lineTo(d2.sx, d2.sy);
-  ctx.stroke();
-
-  // Pipes
-  ctx.strokeStyle = 'rgba(224,96,160,0.7)';
-  ctx.lineWidth = 2.5 / (state.zoom/100);
-  ctx.beginPath();
-  const p1 = iso(-230,-180,-160), p2 = iso(-230,-180,160);
-  const p3 = iso(230,-180,-160), p4 = iso(230,-180,160);
-  ctx.moveTo(p1.sx,p1.sy); ctx.lineTo(p2.sx,p2.sy);
-  ctx.moveTo(p3.sx,p3.sy); ctx.lineTo(p4.sx,p4.sy);
-  ctx.stroke();
-
-  // Clash points
-  if (state.mode === 'nwd') {
-    clashes.slice(0,4).forEach((c, i) => {
-      const px = iso(-100 + i*60, -120, -100 + i*40);
-      const rad = 8 / (state.zoom/100);
-      const pulse = 0.7 + 0.3 * Math.sin(t * 3 + i);
-      ctx.beginPath();
-      ctx.arc(px.sx, px.sy, rad * pulse, 0, Math.PI*2);
-      ctx.fillStyle = c.type === 'hard' ? 'rgba(224,80,80,0.8)' :
-                      c.type === 'soft' ? 'rgba(240,128,64,0.8)' : 'rgba(224,176,64,0.8)';
-      ctx.fill();
-      ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 1 / (state.zoom/100);
-      ctx.stroke();
-    });
-  }
+  CLASHES.slice(0,4).forEach((c,i)=>{
+    const px=iso(-100+i*60,-120,-100+i*40);
+    const r=8/(S.zoom/100);
+    const pulse=0.7+0.3*Math.sin(t*3+i);
+    ctx.beginPath();ctx.arc(px.sx,px.sy,r*pulse,0,Math.PI*2);
+    ctx.fillStyle=c.type==='hard'?'rgba(224,80,80,.85)':c.type==='soft'?'rgba(240,128,64,.85)':'rgba(224,176,64,.85)';
+    ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1/(S.zoom/100);ctx.stroke();
+  });
 }
 
-function drawMeasureOverlay(ctx, W, H) {
-  if (state.measurePoints.length === 0) return;
-  ctx.save();
-
-  const toScreen = (p) => ({
-    x: p.x * (state.zoom/100) + state.pan.x + W/2,
-    y: p.y * (state.zoom/100) + state.pan.y + H/2
-  });
-
-  state.measurePoints.forEach((p, i) => {
-    const s = toScreen(p);
-    ctx.beginPath();
-    ctx.arc(s.x, s.y, 5, 0, Math.PI*2);
-    ctx.fillStyle = '#00b4d8';
-    ctx.fill();
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-
-    if (i > 0) {
-      const prev = toScreen(state.measurePoints[i-1]);
-      ctx.beginPath();
-      ctx.moveTo(prev.x, prev.y);
-      ctx.lineTo(s.x, s.y);
-      ctx.strokeStyle = '#00b4d8';
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash([5,3]);
-      ctx.stroke();
-      ctx.setLineDash([]);
-
-      const mx = (prev.x + s.x)/2, my = (prev.y + s.y)/2;
-      const dx = state.measurePoints[i].x - state.measurePoints[i-1].x;
-      const dy = state.measurePoints[i].y - state.measurePoints[i-1].y;
-      const dist = (Math.sqrt(dx*dx+dy*dy) * 0.01).toFixed(3);
-      ctx.fillStyle = 'rgba(13,15,18,0.85)';
-      ctx.fillRect(mx-28, my-12, 56, 18);
-      ctx.strokeStyle = '#00b4d8';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(mx-28, my-12, 56, 18);
-      ctx.fillStyle = '#00b4d8';
-      ctx.font = '10px IBM Plex Mono';
-      ctx.textAlign = 'center';
-      ctx.fillText(dist + 'm', mx, my+1);
+// ── MEASURE OVERLAY ────────────────────────────────────────
+function drawMeasOverlay(ctx,W,H){
+  if(!S.mPts.length) return;
+  const ts=p=>({x:p.x*(S.zoom/100)+S.pan.x+W/2,y:p.y*(S.zoom/100)+S.pan.y+H/2});
+  S.mPts.forEach((p,i)=>{
+    const s=ts(p);
+    ctx.beginPath();ctx.arc(s.x,s.y,5,0,Math.PI*2);ctx.fillStyle='#00b4d8';ctx.fill();
+    ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.stroke();
+    if(i>0){
+      const prev=ts(S.mPts[i-1]);
+      ctx.beginPath();ctx.moveTo(prev.x,prev.y);ctx.lineTo(s.x,s.y);
+      ctx.strokeStyle='#00b4d8';ctx.lineWidth=1.5;ctx.setLineDash([5,3]);ctx.stroke();ctx.setLineDash([]);
+      const mx=(prev.x+s.x)/2,my=(prev.y+s.y)/2;
+      const dx=(p.x-S.mPts[i-1].x)*0.01,dy=(p.y-S.mPts[i-1].y)*0.01;
+      const dist=Math.sqrt(dx*dx+dy*dy).toFixed(3);
+      ctx.fillStyle='rgba(13,15,18,.88)';ctx.fillRect(mx-30,my-12,60,18);
+      ctx.strokeStyle='#00b4d8';ctx.lineWidth=1;ctx.strokeRect(mx-30,my-12,60,18);
+      ctx.fillStyle='#00b4d8';ctx.font='10px IBM Plex Mono';ctx.textAlign='center';ctx.fillText(dist+'m',mx,my+1);
     }
   });
-
-  // Mouse preview
-  if (state.measurePoints.length > 0 && state.tool.startsWith('measure')) {
-    const last = toScreen(state.measurePoints[state.measurePoints.length-1]);
-    ctx.beginPath();
-    ctx.moveTo(last.x, last.y);
-    ctx.lineTo(state.mousePos.x, state.mousePos.y);
-    ctx.strokeStyle = 'rgba(0,180,216,0.4)';
-    ctx.lineWidth = 1;
-    ctx.setLineDash([4,4]);
-    ctx.stroke();
-    ctx.setLineDash([]);
+  if(S.mPts.length&&S.tool.startsWith('m')){
+    const last=ts(S.mPts[S.mPts.length-1]);
+    ctx.beginPath();ctx.moveTo(last.x,last.y);ctx.lineTo(S.mousePos.x,S.mousePos.y);
+    ctx.strokeStyle='rgba(0,180,216,.35)';ctx.lineWidth=1;ctx.setLineDash([4,4]);ctx.stroke();ctx.setLineDash([]);
   }
-
-  ctx.restore();
 }
 
-function drawMiniMap() {
-  const mc = document.getElementById('miniCanvas');
-  const mctx = mc.getContext('2d');
-  mctx.clearRect(0,0,120,90);
-  mctx.fillStyle = '#0a0c0f';
-  mctx.fillRect(0,0,120,90);
-  if (!state.fileLoaded) return;
-
-  // scale
-  mctx.save();
-  mctx.translate(60,45);
-  mctx.scale(0.09, 0.09);
-  if (state.mode === 'dwg') {
-    mctx.strokeStyle = 'rgba(224,80,80,0.6)'; mctx.lineWidth = 10;
-    mctx.strokeRect(-320,-200,640,400);
-    mctx.strokeStyle = 'rgba(61,220,132,0.5)'; mctx.lineWidth = 5;
-    mctx.beginPath();
-    for (let x=-320;x<=320;x+=160){mctx.moveTo(x,-200);mctx.lineTo(x,200);}
-    for (let y=-200;y<=200;y+=100){mctx.moveTo(-320,y);mctx.lineTo(320,y);}
-    mctx.stroke();
+function drawMiniMap(){
+  const mc=document.getElementById('mc2');
+  const mctx=mc.getContext('2d');
+  mctx.clearRect(0,0,110,82);mctx.fillStyle='#0a0c0f';mctx.fillRect(0,0,110,82);
+  if(S.fileType==='image'&&S.imgBitmap){
+    mctx.save();mctx.globalAlpha=0.8;
+    mctx.drawImage(S.imgBitmap,5,5,100,72);
+    mctx.restore();
+  } else if(S.fileType==='pdf'&&S.pdfPages.length){
+    mctx.save();mctx.globalAlpha=0.8;
+    mctx.drawImage(S.pdfPages[S.pdfPageIdx].canvas,5,5,100,72);
+    mctx.restore();
   } else {
-    mctx.strokeStyle = 'rgba(27,143,227,0.6)'; mctx.lineWidth = 10;
-    mctx.strokeRect(-250,-200,500,400);
-  }
-
-  // Viewport indicator
-  const vx = -state.pan.x, vy = -state.pan.y;
-  const vs = 100 / (state.zoom/100) * 5;
-  mctx.strokeStyle = 'rgba(0,180,216,0.8)';
-  mctx.lineWidth = 8;
-  mctx.strokeRect(vx - vs/2, vy - vs/2, vs, vs);
-  mctx.restore();
-}
-
-/* ===================== TOOLS ===================== */
-function setTool(tool, btn) {
-  state.tool = tool;
-  document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
-  if (btn) btn.classList.add('active');
-  document.getElementById('toolDisplay').textContent = tool.replace('-',' ').replace(/\b\w/g,c=>c.toUpperCase());
-
-  if (tool.startsWith('measure')) {
-    state.measurePoints = [];
-    showToast('📏 Click to set measurement points. Double-click to finish.');
-  }
-}
-
-function fitToScreen() {
-  state.pan = { x: 0, y: 0 };
-  state.zoom = 100;
-  updateZoomDisplay();
-  showToast('⊡ Fit to screen');
-}
-
-function adjustZoom(delta) {
-  state.zoom = Math.max(10, Math.min(800, state.zoom + delta));
-  updateZoomDisplay();
-}
-
-function resetZoom() { state.zoom = 100; updateZoomDisplay(); }
-
-function updateZoomDisplay() {
-  document.getElementById('zoomVal').textContent = state.zoom + '%';
-}
-
-function toggleGrid() {
-  state.grid = !state.grid;
-  showToast(state.grid ? '⊞ Grid on' : '⊟ Grid off');
-}
-
-function prevView() { showToast('◁ Previous view'); }
-function nextView() { showToast('▷ Next view'); }
-
-function setViewAngle(v) {
-  state.viewAngle = v;
-  showToast('👁 View: ' + v.toUpperCase());
-}
-
-/* ===================== MOUSE ===================== */
-function onMouseDown(e) {
-  if (e.button !== 0) return;
-  state.dragging = true;
-  state.lastMouse = { x: e.clientX, y: e.clientY };
-
-  if (state.tool.startsWith('measure') && state.fileLoaded) {
-    const ca = document.getElementById('canvasArea').getBoundingClientRect();
-    const W = ca.width, H = ca.height;
-    const wx = (e.clientX - ca.left - state.pan.x - W/2) / (state.zoom/100);
-    const wy = (e.clientY - ca.top - state.pan.y - H/2) / (state.zoom/100);
-    state.measurePoints.push({ x: wx, y: wy });
-    updateMeasurePanel();
-  }
-}
-
-function onMouseMove(e) {
-  const ca = document.getElementById('canvasArea').getBoundingClientRect();
-  state.mousePos = { x: e.clientX - ca.left, y: e.clientY - ca.top };
-
-  const W = ca.width, H = ca.height;
-  const wx = (e.clientX - ca.left - state.pan.x - W/2) / (state.zoom/100);
-  const wy = (e.clientY - ca.top - state.pan.y - H/2) / (state.zoom/100);
-
-  document.getElementById('coordX').textContent = (wx * 0.01).toFixed(2);
-  document.getElementById('coordY').textContent = (-wy * 0.01).toFixed(2);
-
-  if (state.dragging && (state.tool === 'pan' || state.tool === 'select')) {
-    const dx = e.clientX - state.lastMouse.x;
-    const dy = e.clientY - state.lastMouse.y;
-    state.pan.x += dx;
-    state.pan.y += dy;
-    state.lastMouse = { x: e.clientX, y: e.clientY };
-  }
-}
-
-function onMouseUp(e) {
-  state.dragging = false;
-}
-
-function onWheel(e) {
-  e.preventDefault();
-  const delta = e.deltaY > 0 ? -5 : 5;
-  state.zoom = Math.max(10, Math.min(800, state.zoom + delta));
-  updateZoomDisplay();
-}
-
-/* ===================== MODE ===================== */
-function setMode(mode, btn) {
-  state.mode = mode;
-  document.querySelectorAll('.header-tab').forEach(t => t.classList.remove('active'));
-  btn.classList.add('active');
-  document.getElementById('modeDisplay').textContent = mode === 'dwg' ? 'DWG Viewer' : 'NWD/NWC Viewer';
-  document.getElementById('coordZ').textContent = mode === 'nwd' ? '0.00' : '–';
-
-  // Show/hide layout selector
-  document.getElementById('layoutLabel').style.display = mode === 'dwg' ? '' : 'none';
-  document.getElementById('layoutSelector').style.display = mode === 'dwg' ? 'flex' : 'none';
-
-  // Update right panel
-  document.getElementById('rpanelTitle').innerHTML = mode === 'nwd'
-    ? '⚠ Clash Detection <span class="clash-badge" id="clashBadge">12</span>'
-    : 'ℹ Section Controls';
-
-  if (mode === 'nwd') buildClashPanel();
-  else buildSectionPanel();
-
-  showToast(mode === 'dwg' ? '📐 DWG mode' : '🧊 3D NWD/NWC mode');
-}
-
-function switchLayout(name, btn) {
-  state.currentLayout = name;
-  document.querySelectorAll('#layoutSelector .tool-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  showToast('📄 Layout: ' + name);
-}
-
-/* ===================== FILE ===================== */
-function triggerFileOpen() {
-  document.getElementById('fileInput').click();
-}
-
-function handleFileLoad(input) {
-  const file = input.files[0];
-  if (!file) return;
-  const ext = file.name.split('.').pop().toLowerCase();
-
-  document.getElementById('loadingOverlay').classList.remove('hidden');
-  document.getElementById('loaderFill').style.animation = 'none';
-  document.getElementById('loaderFill').style.width = '0%';
-  document.getElementById('loaderText').textContent = 'Reading ' + ext.toUpperCase() + ' file...';
-
-  setTimeout(() => {
-    document.getElementById('loaderFill').style.transition = 'width 2s ease';
-    document.getElementById('loaderFill').style.width = '100%';
-    document.getElementById('loaderText').textContent = 'Processing geometry...';
-  }, 100);
-
-  setTimeout(() => {
-    document.getElementById('loadingOverlay').classList.add('hidden');
-    state.fileLoaded = true;
-    document.getElementById('dropZone').classList.add('hidden');
-    document.getElementById('fileNameDisplay').textContent = file.name;
-    document.getElementById('statusText').textContent = 'File loaded';
-
-    if (ext === 'nwd' || ext === 'nwc') {
-      const btn = document.querySelector('.header-tab:nth-child(2)');
-      setMode('nwd', btn);
+    mctx.save();mctx.translate(55,41);mctx.scale(0.08,0.08);
+    if(S.mode==='dwg'){
+      mctx.strokeStyle='rgba(224,80,80,.6)';mctx.lineWidth=10;mctx.strokeRect(-320,-200,640,400);
+      mctx.strokeStyle='rgba(61,220,132,.4)';mctx.lineWidth=5;mctx.beginPath();
+      for(let x=-320;x<=320;x+=160){mctx.moveTo(x,-200);mctx.lineTo(x,200);}
+      for(let y=-200;y<=200;y+=100){mctx.moveTo(-320,y);mctx.lineTo(320,y);}
+      mctx.stroke();
     } else {
-      const btn = document.querySelector('.header-tab:nth-child(1)');
-      setMode('dwg', btn);
+      mctx.strokeStyle='rgba(27,143,227,.6)';mctx.lineWidth=10;mctx.strokeRect(-250,-200,500,400);
     }
-
-    updateFileProps(file);
-    showToast('✅ ' + file.name + ' loaded successfully');
-  }, 2800);
-}
-
-function updateFileProps(file) {
-  const ext = file.name.split('.').pop().toLowerCase();
-  const props = [
-    { key: 'filename', val: file.name },
-    { key: 'format', val: ext.toUpperCase() },
-    { key: 'size', val: (file.size/1024).toFixed(1) + ' KB' },
-    { key: 'modified', val: new Date(file.lastModified).toLocaleDateString() },
-    { key: 'units', val: 'Millimeters' },
-    { key: 'scale', val: '1:100' },
-    { key: 'coord-sys', val: 'WCS' },
-    { key: 'layers', val: layers.length.toString() },
-  ];
-  const el = document.getElementById('fileProps');
-  el.innerHTML = props.map(p =>
-    `<div class="prop-row"><div class="prop-key">${p.key}</div><div class="prop-val">${p.val}</div></div>`
-  ).join('');
-  document.getElementById('scaleDisplay').textContent = '1:100';
-}
-
-/* ===================== UI BUILDERS ===================== */
-function buildLayers() {
-  const el = document.getElementById('layerList');
-  el.innerHTML = layers.map((l, i) => `
-    <div class="layer-item" id="layer-${i}">
-      <div class="layer-eye ${l.visible?'':'hidden'}" onclick="toggleLayer(${i})" title="${l.visible?'Hide':'Show'}">
-        ${l.visible ? '👁' : '🚫'}
-      </div>
-      <div class="layer-color" style="background:${l.color}"></div>
-      <div class="layer-name ${l.visible?'':'hidden'}" id="lname-${i}">${l.name}</div>
-    </div>
-  `).join('');
-}
-
-function toggleLayer(i) {
-  layers[i].visible = !layers[i].visible;
-  document.getElementById('layer-'+i).querySelector('.layer-eye').innerHTML = layers[i].visible ? '👁' : '🚫';
-  document.getElementById('layer-'+i).querySelector('.layer-eye').className = 'layer-eye' + (layers[i].visible?'':' hidden');
-  document.getElementById('lname-'+i).className = 'layer-name' + (layers[i].visible?'':' hidden');
-}
-
-function filterLayers(q) {
-  layers.forEach((l, i) => {
-    const el = document.getElementById('layer-'+i);
-    if (el) el.style.display = l.name.toLowerCase().includes(q.toLowerCase()) ? '' : 'none';
-  });
-}
-
-function buildModelTree() {
-  const el = document.getElementById('modelTree');
-  el.innerHTML = modelTree.map(n => `
-    <div class="tree-item ${n.children.length?'':'leaf'}" onclick="selectTreeItem(${n.id}, this)"
-         style="padding-left:${8 + n.indent*14}px">
-      <div class="tree-arrow">${n.children.length ? '▾' : ' '}</div>
-      <div class="tree-icon">${n.icon}</div>
-      <span>${n.name}</span>
-    </div>
-  `).join('');
-}
-
-function selectTreeItem(id, el) {
-  document.querySelectorAll('.tree-item').forEach(t => t.classList.remove('selected'));
-  el.classList.add('selected');
-  const node = modelTree.find(n => n.id === id);
-  if (!node) return;
-  const props = [
-    { key: 'id', val: 'OBJ-' + String(id).padStart(4,'0') },
-    { key: 'name', val: node.name },
-    { key: 'type', val: 'Assembly' },
-    { key: 'level', val: 'L0' + node.indent },
-    { key: 'material', val: 'Concrete C30' },
-    { key: 'volume', val: (Math.random()*50+5).toFixed(2) + ' m³' },
-  ];
-  document.getElementById('objProps').innerHTML = props.map(p =>
-    `<div class="prop-row"><div class="prop-key">${p.key}</div><div class="prop-val">${p.val}</div></div>`
-  ).join('');
-}
-
-function buildProperties() {
-  document.getElementById('fileProps').innerHTML =
-    '<div style="padding:12px;font-size:11px;color:var(--text-muted)">Load a file to view properties</div>';
-}
-
-function buildClashPanel() {
-  const el = document.getElementById('rightPanelContent');
-  el.innerHTML = clashes.map((c, i) => `
-    <div class="clash-item" onclick="selectClash(${i}, this)">
-      <div class="clash-id">${c.id}</div>
-      <div class="clash-desc">${c.desc}</div>
-      <div class="clash-meta">
-        <span class="clash-tag tag-${c.type}">${c.type.toUpperCase()}</span>
-        <span style="font-size:10px;font-family:var(--font-mono);color:var(--text-muted);margin-left:auto">${c.dist}</span>
-      </div>
-    </div>
-  `).join('');
-}
-
-function selectClash(i, el) {
-  document.querySelectorAll('.clash-item').forEach(c => c.classList.remove('selected'));
-  el.classList.add('selected');
-  showToast('⚠ ' + clashes[i].id + ': ' + clashes[i].desc);
-}
-
-function buildSectionPanel() {
-  const el = document.getElementById('rightPanelContent');
-  el.innerHTML = `
-    <div class="rpanel-header" style="font-size:10px;color:var(--text-muted);letter-spacing:.5px;text-transform:uppercase;padding:8px 12px">Section Planes</div>
-    <div class="section-widget">
-      ${['X','Y','Z'].map(ax => `
-        <div class="axis-slider">
-          <div class="axis-label ${ax.toLowerCase()}">${ax}</div>
-          <input type="range" min="-100" max="100" value="0" oninput="updateSection('${ax}',this.value,this.nextElementSibling)"/>
-          <div class="axis-val">0.00</div>
-        </div>
-      `).join('')}
-      <div style="padding:8px 0">
-        <button class="header-btn" style="width:100%;justify-content:center" onclick="showToast('✂ Section box enabled')">
-          ⬜ Section Box
-        </button>
-      </div>
-    </div>
-    <div class="rpanel-header" style="font-size:10px;color:var(--text-muted);letter-spacing:.5px;text-transform:uppercase;padding:8px 12px;border-top:1px solid var(--border)">Measurement</div>
-    <div class="measure-panel" id="measurePanel">
-      <div style="font-size:11px;color:var(--text-muted)">Use measure tools then click canvas</div>
-    </div>
-  `;
-}
-
-function updateSection(axis, val, display) {
-  display.textContent = parseFloat(val).toFixed(2);
-  showToast('✂ Section ' + axis + ': ' + parseFloat(val).toFixed(2) + 'm');
-}
-
-function updateMeasurePanel() {
-  const el = document.getElementById('measurePanel');
-  if (!el) return;
-  if (state.measurePoints.length < 2) return;
-  const p1 = state.measurePoints[state.measurePoints.length-2];
-  const p2 = state.measurePoints[state.measurePoints.length-1];
-  const dx = (p2.x - p1.x)*0.01, dy = (p2.y - p1.y)*0.01;
-  const dist = Math.sqrt(dx*dx+dy*dy);
-  el.innerHTML = `
-    <div class="measure-row"><div class="measure-label">Distance</div><div class="measure-value">${dist.toFixed(3)} m</div></div>
-    <div class="measure-row"><div class="measure-label">ΔX</div><div class="measure-value">${Math.abs(dx).toFixed(3)} m</div></div>
-    <div class="measure-row"><div class="measure-label">ΔY</div><div class="measure-value">${Math.abs(dy).toFixed(3)} m</div></div>
-    <div class="measure-row"><div class="measure-label">Angle</div><div class="measure-value">${(Math.atan2(dy,dx)*180/Math.PI).toFixed(2)}°</div></div>
-  `;
-}
-
-function toggleSection3D(type) {
-  if (state.mode !== 'nwd') { showToast('ℹ Section planes available in 3D mode'); return; }
-  showToast('✂ Section plane controls in right panel');
-}
-
-/* ===================== CONTEXT MENU ===================== */
-function showContextMenu(e) {
-  e.preventDefault();
-  const menu = document.getElementById('ctxMenu');
-  menu.style.left = e.clientX + 'px';
-  menu.style.top = e.clientY + 'px';
-  menu.classList.add('show');
-}
-
-function ctxAction(action) {
-  const msgs = {
-    isolate: '🔍 Object isolated',
-    hide: '👁 Object hidden',
-    color: '🎨 Color override applied',
-    measure: '📏 Measurement started from point',
-    properties: 'ℹ Properties panel updated',
-    'copy-coords': '📋 Coordinates copied to clipboard'
-  };
-  showToast(msgs[action] || action);
-  document.getElementById('ctxMenu').classList.remove('show');
-}
-
-/* ===================== PANEL UTILS ===================== */
-function switchTab(tab, btn) {
-  document.querySelectorAll('.panel-tab').forEach(t => t.classList.remove('active'));
-  btn.classList.add('active');
-  document.getElementById('tab-layers').style.display = tab === 'layers' ? '' : 'none';
-  document.getElementById('tab-model').style.display = tab === 'model' ? '' : 'none';
-  document.getElementById('tab-props').style.display = tab === 'props' ? '' : 'none';
-}
-
-function toggleSection(section) {
-  section.classList.toggle('collapsed');
-}
-
-/* ===================== TOAST ===================== */
-let _toastTimer;
-function showToast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  clearTimeout(_toastTimer);
-  _toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
-}
-
-/* ===================== DRAG & DROP ===================== */
-document.addEventListener('DOMContentLoaded', () => {
-  const ca = document.getElementById('canvasArea');
-  ca.addEventListener('dragover', e => { e.preventDefault(); });
-  ca.addEventListener('drop', e => {
-    e.preventDefault();
-    const file = e.dataTransfer.files[0];
-    if (file) {
-      const fakeInput = { files: [file] };
-      handleFileLoad(fakeInput);
-    }
-  });
-});
-
-// Demo: auto-load after short delay to show populated UI
-setTimeout(() => {
-  if (!state.fileLoaded) {
-    state.fileLoaded = true;
-    document.getElementById('dropZone').classList.add('hidden');
-    document.getElementById('fileNameDisplay').textContent = 'GroundFloor_Plan_RevA3.dwg';
-    document.getElementById('statusText').textContent = 'Demo file loaded';
-    buildProperties();
-    document.getElementById('fileProps').innerHTML = [
-      { key: 'filename', val: 'GroundFloor_Plan_RevA3.dwg' },
-      { key: 'format', val: 'DWG 2024' },
-      { key: 'size', val: '14.2 MB' },
-      { key: 'units', val: 'Millimeters' },
-      { key: 'scale', val: '1:100' },
-      { key: 'coord-sys', val: 'WCS' },
-      { key: 'layers', val: '12' },
-      { key: 'entities', val: '48,291' },
-    ].map(p => `<div class="prop-row"><div class="prop-key">${p.key}</div><div class="prop-val">${p.val}</div></div>`).join('');
-    document.getElementById('scaleDisplay').textContent = '1:100';
-    document.getElementById('clashBadge').textContent = '12';
+    mctx.restore();
   }
-}, 2700);
+  // Viewport indicator
+  const vx=-S.pan.x,vy=-S.pan.y,vs=100/(S.zoom/100)*5;
+  const mc2=document.getElementById('mc2');
+  const mctx2=mc2.getContext('2d');
+  mctx2.strokeStyle='rgba(0,180,216,.8)';mctx2.lineWidth=2;
+  mctx2.strokeRect(55+vx*0.08-vs*0.08/2,41+vy*0.08-vs*0.08/2,vs*0.08,vs*0.08);
+}
+
+// ══════════════════════════════════════════════════════════
+//  FILE HANDLING — THE REAL IMPLEMENTATION
+// ══════════════════════════════════════════════════════════
+function triggerUpload(){ document.getElementById('FI').click(); }
+function onDrop(e){ e.preventDefault(); const f=e.dataTransfer.files[0]; if(f) processFile(f); }
+function handleFile(inp){ const f=inp.files[0]; if(f){inp.value='';processFile(f);} }
+
+function processFile(file){
+  const name=file.name;
+  const ext=name.split('.').pop().toLowerCase();
+  const isImg=['png','jpg','jpeg','gif','bmp','webp','svg'].includes(ext);
+  const isPdf=ext==='pdf';
+  const isDxf=ext==='dxf';
+  const isDwg=['dwg','nwd','nwc'].includes(ext);
+  const isIfc=['ifc','rvt'].includes(ext);
+
+  showModal(name, ext);
+  document.getElementById('DZ').classList.add('h');
+  document.getElementById('UNS').classList.remove('show');
+
+  if(isImg){
+    // ── IMAGES: read → ImageBitmap → render ──
+    stepM(1);
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      stepM(2);
+      const img=new Image();
+      img.onload=()=>{
+        stepM(3);
+        createImageBitmap(img).then(bmp=>{
+          stepM(4);
+          S.imgBitmap=bmp; S.dxfEntities=[]; S.pdfPages=[];
+          // Auto-fit
+          const cv=document.getElementById('MC');
+          const scX=cv.width/img.naturalWidth*85;
+          const scY=cv.height/img.naturalHeight*85;
+          S.zoom=Math.min(scX,scY); S.pan={x:0,y:0};
+          updateZB();
+          doneLoad(file,ext,'image');
+          updateProps_image(file,img);
+        });
+      };
+      img.src=ev.target.result;
+    };
+    reader.readAsDataURL(file);
+
+  } else if(isPdf){
+    // ── PDF: render with pdf.js ──
+    if(typeof pdfjsLib==='undefined'){
+      doneLoad(file,ext,'unsupported');
+      showUnsupported('📄',name,'PDF.js not loaded. Include pdf.js to render PDFs.',
+        'Add: <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js">');
+      return;
+    }
+    stepM(1);
+    const reader=new FileReader();
+    reader.onload=async ev=>{
+      try{
+        stepM(2);
+        const pdf=await pdfjsLib.getDocument({data:ev.target.result}).promise;
+        S.pdfPages=[];
+        stepM(3);
+        // Render all pages to offscreen canvases
+        for(let i=1;i<=pdf.numPages;i++){
+          const pg=await pdf.getPage(i);
+          const vp=pg.getViewport({scale:2});
+          const oc=document.createElement('canvas');
+          oc.width=vp.width; oc.height=vp.height;
+          await pg.render({canvasContext:oc.getContext('2d'),viewport:vp}).promise;
+          S.pdfPages.push({canvas:oc,width:vp.width,height:vp.height});
+        }
+        stepM(4);
+        S.imgBitmap=null; S.dxfEntities=[];
+        S.pdfPageIdx=0;
+        const cv=document.getElementById('MC');
+        const p0=S.pdfPages[0];
+        const scX=cv.width/p0.width*85;
+        const scY=cv.height/p0.height*85;
+        S.zoom=Math.min(scX,scY)*100; S.pan={x:0,y:0};
+        updateZB();
+        doneLoad(file,ext,'pdf');
+        updateProps_pdf(file,pdf.numPages);
+      }catch(err){
+        doneLoad(file,ext,'unsupported');
+        showUnsupported('❌',name,'PDF render failed: '+err.message,'');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+
+  } else if(isDxf){
+    // ── DXF: parse with dxf-parser, render entities ──
+    if(typeof DxfParser==='undefined'){
+      // Fallback: still render as demo with metadata
+      doneLoad(file,ext,'demo');
+      showT('⚠ DXF parser not loaded — showing layout preview');
+      return;
+    }
+    stepM(1);
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      try{
+        stepM(2);
+        const parser=new DxfParser();
+        const dxf=parser.parseSync(ev.target.result);
+        stepM(3);
+
+        // Extract layers
+        LAYERS=[];
+        S.dxfLayers={};
+        if(dxf.tables&&dxf.tables.layer){
+          Object.entries(dxf.tables.layer.layers||{}).forEach(([name,lyr])=>{
+            const c=aciColor(lyr.color||7);
+            LAYERS.push({name:name.toUpperCase(),color:c,visible:true});
+            S.dxfLayers[name.toUpperCase()]={color:lyr.color};
+          });
+        }
+        if(!LAYERS.length) LAYERS=[{name:'0',color:'#ffffff',visible:true}];
+
+        // Flatten all entities (including from blocks)
+        S.dxfEntities=[];
+        const addEntities=(ents)=>{ if(ents) ents.forEach(e=>{ if(e) S.dxfEntities.push(e); }); };
+        if(dxf.entities) addEntities(dxf.entities);
+
+        // Compute bounds
+        let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+        S.dxfEntities.forEach(e=>{
+          const pts=[];
+          if(e.vertices) e.vertices.forEach(v=>{if(v){pts.push([v.x||0,v.y||0]);}});
+          if(e.center) pts.push([e.center.x||0,e.center.y||0]);
+          if(e.startPoint) pts.push([e.startPoint.x||0,e.startPoint.y||0]);
+          if(e.endPoint) pts.push([e.endPoint.x||0,e.endPoint.y||0]);
+          if(e.position) pts.push([e.position.x||0,e.position.y||0]);
+          pts.forEach(([x,y])=>{
+            if(isFinite(x)&&isFinite(y)){
+              if(x<minX)minX=x;if(x>maxX)maxX=x;
+              if(y<minY)minY=y;if(y>maxY)maxY=y;
+            }
+          });
+        });
+        if(!isFinite(minX)){minX=0;minY=0;maxX=1000;maxY=1000;}
+        S.dxfBounds={minX,minY,maxX,maxY};
+
+        stepM(4);
+        S.imgBitmap=null; S.pdfPages=[];
+        // Auto-fit zoom to bounding box
+        const cv=document.getElementById('MC');
+        const rangeX=maxX-minX||1000, rangeY=maxY-minY||1000;
+        const fitZ=Math.min(cv.width/rangeX,cv.height/rangeY)*80;
+        S.zoom=Math.max(5,Math.min(500,fitZ)); S.pan={x:0,y:0};
+        updateZB();
+
+        buildLL(); // rebuild layer list from DXF layers
+        doneLoad(file,ext,'dxf');
+        updateProps_dxf(file,dxf,S.dxfEntities.length);
+        showT('✅ DXF loaded — '+S.dxfEntities.length+' entities, '+LAYERS.length+' layers');
+      }catch(err){
+        console.error('DXF parse error:',err);
+        doneLoad(file,ext,'demo');
+        showT('⚠ DXF parse failed ('+err.message+') — showing layout');
+        updateProps_cad(file,ext,'Parse error: '+err.message);
+      }
+    };
+    reader.readAsText(file,'utf-8');
+
+  } else if(isDwg){
+    // ── DWG/NWD/NWC: binary format, cannot parse in browser ──
+    // Show real file metadata + clear notice
+    stepM(1);
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      stepM(2);
+      const bytes=new Uint8Array(ev.target.result.slice(0,12));
+      const magic=String.fromCharCode(bytes[0],bytes[1]);
+      const version=String.fromCharCode(...bytes.slice(0,6));
+      const isDwgValid=magic==='AC';
+      stepM(3);
+      setTimeout(()=>{
+        stepM(4);
+        setTimeout(()=>{
+          doneLoad(file,ext,'dwg');
+          // Show the unsupported notice WITH real file info
+          document.getElementById('UNS').classList.add('show');
+          document.getElementById('unsIcon').textContent = isDwgValid?'📐':'⚠';
+          document.getElementById('unsTitle').textContent = isDwgValid
+            ? file.name+' — DWG '+version+' detected'
+            : file.name+' — '+ext.toUpperCase()+' file';
+          document.getElementById('unsSub').innerHTML =
+            '<b>'+ext.toUpperCase()+'</b> is a proprietary binary format that cannot be rendered in a pure browser without a conversion server.<br><br>'+
+            'To render this file, you need one of:<br>'+
+            '• Convert to <b>DXF</b> (in AutoCAD: Save As → DXF) — loads instantly<br>'+
+            '• Use <b>Autodesk APS backend</b> (see server/ folder)<br>'+
+            '• Export as <b>PDF or PNG</b> from your CAD software';
+          document.getElementById('unsNote').textContent =
+            'File: '+file.name+'\nSize: '+(file.size/1024/1024).toFixed(2)+' MB\nFormat: '+version+'\nStatus: Metadata read ✓ | Binary geometry: requires backend';
+          updateProps_cad(file,ext,version);
+          showT('ℹ '+ext.toUpperCase()+' detected ('+version+') — convert to DXF/PDF for browser rendering');
+        },500);
+      },500);
+    };
+    reader.readAsArrayBuffer(file);
+
+  } else if(isIfc){
+    stepM(1);stepM(2);stepM(3);stepM(4);
+    doneLoad(file,ext,'unsupported');
+    showUnsupported('🏗',file.name,
+      'IFC/RVT requires a server-side IFC parser (IfcOpenShell or similar).',
+      'Convert to DXF in Revit: File → Export → CAD Formats → DXF');
+
+  } else {
+    stepM(1);stepM(2);stepM(3);stepM(4);
+    doneLoad(file,ext,'unsupported');
+    showUnsupported('❓',file.name,'Unknown file format: .'+ext,'Supported for browser rendering: DXF, PNG, JPG, PDF');
+  }
+}
+
+function showUnsupported(icon,title,sub,note){
+  document.getElementById('UNS').classList.add('show');
+  document.getElementById('unsIcon').textContent=icon;
+  document.getElementById('unsTitle').textContent=title;
+  document.getElementById('unsSub').innerHTML=sub;
+  document.getElementById('unsNote').textContent=note;
+}
+
+// ── MODAL HELPERS ──────────────────────────────────────────
+let _umT;
+function showModal(name,ext){
+  clearTimeout(_umT);
+  document.getElementById('umT').textContent='Loading '+name;
+  document.getElementById('umS').textContent=ext.toUpperCase()+' file';
+  document.getElementById('umF').style.width='0%';
+  ['us1','us2','us3','us4'].forEach(id=>document.getElementById(id).className='umst');
+  document.getElementById('UM').classList.add('show');
+}
+function stepM(n){
+  const pcts=['10%','35%','65%','90%'];
+  document.getElementById('umF').style.width=pcts[n-1];
+  for(let i=1;i<=4;i++){
+    const el=document.getElementById('us'+i);
+    el.className='umst'+(i<n?' done':i===n?' active':'');
+  }
+}
+function doneLoad(file,ext,type){
+  document.getElementById('umF').style.width='100%';
+  ['us1','us2','us3','us4'].forEach(id=>document.getElementById(id).className='umst done');
+  _umT=setTimeout(()=>{
+    document.getElementById('UM').classList.remove('show');
+    S.loaded=true; S.fileType=type;
+    document.getElementById('fcn').textContent=file.name;
+    document.getElementById('sSt').textContent='Loaded';
+    // Set mode
+    const ext2=ext.toLowerCase();
+    if(['nwd','nwc','ifc','rvt'].includes(ext2)){
+      document.querySelectorAll('.htab').forEach(b=>b.classList.remove('on'));
+      document.querySelectorAll('.htab')[1].classList.add('on');
+      setMode('nwd',document.querySelectorAll('.htab')[1]);
+    } else {
+      document.querySelectorAll('.htab').forEach(b=>b.classList.remove('on'));
+      document.querySelectorAll('.htab')[0].classList.add('on');
+      setMode('dwg',document.querySelectorAll('.htab')[0]);
+    }
+  },350);
+}
+
+// ══════════════════════════════════════════════════════════
+//  PROPERTIES PANELS
+// ══════════════════════════════════════════════════════════
+function rows(arr){ return arr.map(r=>`<div class="prow"><div class="pk">${r[0]}</div><div class="pv">${r[1]}</div></div>`).join(''); }
+
+function updateProps_demo(){
+  document.getElementById('PA').innerHTML='<div class="psec">File Properties</div>'+rows([
+    ['filename','GroundFloor_RevA3.dwg'],['format','DWG 2024 (demo)'],
+    ['size','14.2 MB'],['units','Millimeters'],['scale','1:100'],
+    ['coord-sys','WCS'],['layers','12'],['entities','48,291'],
+  ]);
+}
+function updateProps_image(file,img){
+  document.getElementById('PA').innerHTML='<div class="psec">Image Properties</div>'+rows([
+    ['filename',file.name],['format',file.name.split('.').pop().toUpperCase()],
+    ['size',(file.size/1024).toFixed(1)+' KB'],
+    ['resolution',img.naturalWidth+'×'+img.naturalHeight+' px'],
+    ['modified',new Date(file.lastModified).toLocaleDateString()],
+  ]);
+}
+function updateProps_pdf(file,numPages){
+  document.getElementById('PA').innerHTML='<div class="psec">PDF Properties</div>'+rows([
+    ['filename',file.name],['format','PDF'],
+    ['size',(file.size/1024).toFixed(1)+' KB'],
+    ['pages',numPages.toString()],
+    ['modified',new Date(file.lastModified).toLocaleDateString()],
+  ]);
+}
+function updateProps_dxf(file,dxf,entities){
+  document.getElementById('PA').innerHTML='<div class="psec">DXF Properties</div>'+rows([
+    ['filename',file.name],['format','DXF'],
+    ['size',(file.size/1024).toFixed(1)+' KB'],
+    ['entities',entities.toLocaleString()],
+    ['layers',LAYERS.length.toString()],
+    ['units',dxf.header&&dxf.header.$INSUNITS?dxf.header.$INSUNITS:'—'],
+    ['modified',new Date(file.lastModified).toLocaleDateString()],
+  ]);
+}
+function updateProps_cad(file,ext,note){
+  document.getElementById('PA').innerHTML='<div class="psec">File Properties</div>'+rows([
+    ['filename',file.name],['format',ext.toUpperCase()],
+    ['size',(file.size/1024/1024).toFixed(2)+' MB'],
+    ['version',note||'—'],
+    ['status','Metadata read ✓'],
+    ['geometry','Backend required'],
+    ['modified',new Date(file.lastModified).toLocaleDateString()],
+  ]);
+}
+
+// ══════════════════════════════════════════════════════════
+//  LAYER LIST
+// ══════════════════════════════════════════════════════════
+function buildLL(){
+  document.getElementById('LL').innerHTML=LAYERS.map((l,i)=>`
+    <div class="lrow ${l.visible?'':'off'}" id="lr${i}">
+      <div class="eye" onclick="toggleL(${i})">${l.visible?'👁':'🚫'}</div>
+      <div class="sw" style="background:${l.color}"></div>
+      <div class="ln ${l.visible?'':'off'}" id="ln${i}">${l.name}</div>
+    </div>`).join('');
+}
+function toggleL(i){
+  LAYERS[i].visible=!LAYERS[i].visible;
+  const v=LAYERS[i].visible;
+  const row=document.getElementById('lr'+i);
+  const nm=document.getElementById('ln'+i);
+  row.className='lrow'+(v?'':' off');
+  nm.className='ln'+(v?'':' off');
+  row.querySelector('.eye').textContent=v?'👁':'🚫';
+  showT((v?'👁 Showing':'🚫 Hiding')+' layer: '+LAYERS[i].name);
+}
+function filterL(q){
+  LAYERS.forEach((_,i)=>{
+    const r=document.getElementById('lr'+i);
+    if(r) r.style.display=LAYERS[i].name.toLowerCase().includes(q.toLowerCase())?'':'none';
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+//  MODEL TREE
+// ══════════════════════════════════════════════════════════
+function buildMT(){
+  document.getElementById('MT').innerHTML=TREE.map(n=>`
+    <div class="trow" onclick="selNode(${n.id},this)" style="padding-left:${8+n.indent*14}px">
+      <div class="tarr">${n.indent<2?'▾':' '}</div>
+      <span style="font-size:12px">${n.icon}</span>
+      <span>${n.name}</span>
+    </div>`).join('');
+}
+function filterT(q){
+  document.querySelectorAll('#MT .trow').forEach((r,i)=>{
+    r.style.display=TREE[i].name.toLowerCase().includes(q.toLowerCase())?'':'none';
+  });
+}
+function selNode(id,el){
+  document.querySelectorAll('.trow').forEach(r=>r.classList.remove('on'));
+  el.classList.add('on');
+  const node=TREE.find(n=>n.id===id);if(!node)return;
+  showPP('props',document.querySelectorAll('.ptab')[2]);
+  document.getElementById('PA').innerHTML='<div class="psec">Object Properties</div>'+rows([
+    ['id','OBJ-'+String(id).padStart(4,'0')],['name',node.name],['type','Assembly'],
+    ['level','L0'+node.indent],['material','Concrete C30/37'],
+    ['volume',(Math.random()*50+5).toFixed(2)+' m³'],
+    ['area',(Math.random()*200+50).toFixed(2)+' m²'],
+  ]);
+}
+
+// ══════════════════════════════════════════════════════════
+//  CLASH & SECTION PANELS
+// ══════════════════════════════════════════════════════════
+function buildClash(){
+  document.getElementById('rpH').innerHTML='⚠ Clash Detection <span class="cb">'+CLASHES.length+'</span>';
+  document.getElementById('rpCt').innerHTML=CLASHES.map((c,i)=>`
+    <div class="crow" onclick="selClash(${i},this)">
+      <div class="cid">${c.id}</div>
+      <div class="cdesc">${c.desc}</div>
+      <div class="cmeta"><span class="ct ${c.type}">${c.type.toUpperCase()}</span><span class="cdist">${c.dist}</span></div>
+    </div>`).join('');
+}
+function selClash(i,el){
+  document.querySelectorAll('.crow').forEach(r=>r.classList.remove('on'));
+  el.classList.add('on');showT('⚠ '+CLASHES[i].id+': '+CLASHES[i].desc);
+}
+function buildSection(){
+  document.getElementById('rpH').innerHTML='✂ Section Planes';
+  document.getElementById('rpCt').innerHTML=`
+    <div class="scc">
+      ${['X','Y','Z'].map(a=>`<div class="ar"><div class="al ${a.toLowerCase()}">${a}</div>
+        <input type="range" min="-100" max="100" value="0" oninput="updSec('${a}',this.value,this.nextElementSibling)"/>
+        <div class="av">0.00</div></div>`).join('')}
+      <button class="hb" style="width:100%;justify-content:center;margin-top:6px" onclick="showT('⬜ Section box enabled')">⬜ Section Box</button>
+    </div>
+    <div class="psec" style="margin-top:0">Measurement</div>
+    <div id="mpanel"><div class="empty">Use measure tools then click canvas</div></div>`;
+}
+function updSec(a,v,d){ d.textContent=parseFloat(v).toFixed(2); showT('✂ Section '+a+': '+parseFloat(v).toFixed(2)+'m'); }
+function updMeasPanel(){
+  const el=document.getElementById('mpanel');if(!el||S.mPts.length<2)return;
+  const p1=S.mPts[S.mPts.length-2],p2=S.mPts[S.mPts.length-1];
+  const dx=(p2.x-p1.x)*0.01,dy=(p2.y-p1.y)*0.01;
+  const dist=Math.sqrt(dx*dx+dy*dy);
+  el.innerHTML=[['Distance',dist.toFixed(3)+' m'],['ΔX',Math.abs(dx).toFixed(3)+' m'],
+    ['ΔY',Math.abs(dy).toFixed(3)+' m'],['Angle',(Math.atan2(dy,dx)*180/Math.PI).toFixed(2)+'°'],
+  ].map(([l,v])=>`<div class="mr"><span class="ml2">${l}</span><span class="mv">${v}</span></div>`).join('');
+}
+
+// ══════════════════════════════════════════════════════════
+//  MOUSE / ZOOM
+// ══════════════════════════════════════════════════════════
+function mDown(e){
+  if(e.button!==0)return;
+  S.drag=true;S.lastM={x:e.clientX,y:e.clientY};
+  if(S.tool.startsWith('m')&&S.loaded){
+    const r=document.getElementById('CW').getBoundingClientRect();
+    const W=r.width,H=r.height;
+    const wx=(e.clientX-r.left-S.pan.x-W/2)/(S.zoom/100);
+    const wy=(e.clientY-r.top-S.pan.y-H/2)/(S.zoom/100);
+    S.mPts.push({x:wx,y:wy});updMeasPanel();
+  }
+}
+function mMove(e){
+  const r=document.getElementById('CW').getBoundingClientRect();
+  S.mousePos={x:e.clientX-r.left,y:e.clientY-r.top};
+  const W=r.width,H=r.height;
+  const wx=(e.clientX-r.left-S.pan.x-W/2)/(S.zoom/100);
+  const wy=(e.clientY-r.top-S.pan.y-H/2)/(S.zoom/100);
+  document.getElementById('sX').textContent=(wx*0.01).toFixed(2);
+  document.getElementById('sY').textContent=(-wy*0.01).toFixed(2);
+  if(S.drag&&(S.tool==='select'||S.tool==='pan'||S.tool==='orbit')){
+    S.pan.x+=e.clientX-S.lastM.x; S.pan.y+=e.clientY-S.lastM.y;
+    S.lastM={x:e.clientX,y:e.clientY};
+  }
+}
+function mUp(){ S.drag=false; }
+function mWheel(e){
+  e.preventDefault();
+  const r=document.getElementById('CW').getBoundingClientRect();
+  const mx=e.clientX-r.left-r.width/2-S.pan.x;
+  const my=e.clientY-r.top-r.height/2-S.pan.y;
+  const factor=e.deltaY<0?1.1:0.91;
+  const nz=Math.max(3,Math.min(2000,S.zoom*factor));
+  const sc=nz/S.zoom;
+  S.pan.x-=mx*(sc-1); S.pan.y-=my*(sc-1);
+  S.zoom=nz; updateZB();
+}
+function mDbl(e){ if(S.tool.startsWith('m')) showT('📏 Measurement complete — '+S.mPts.length+' points'); }
+function showCtx(e){
+  e.preventDefault();
+  const m=document.getElementById('CTX');
+  m.style.left=e.clientX+'px';m.style.top=e.clientY+'px';m.classList.add('show');
+}
+function ctxDo(a){
+  const msgs={isolate:'🔍 Object isolated',hide:'👁 Object hidden',showall:'👀 All shown',
+    measure:'📏 Measure from here',props:'ℹ Properties updated',coords:'📋 Coords copied'};
+  if(a==='coords'){
+    const t=`X:${document.getElementById('sX').textContent} Y:${document.getElementById('sY').textContent}`;
+    navigator.clipboard.writeText(t).catch(()=>{});
+  }
+  showT(msgs[a]||a); document.getElementById('CTX').classList.remove('show');
+}
+
+// ══════════════════════════════════════════════════════════
+//  TOOLS & VIEW
+// ══════════════════════════════════════════════════════════
+function setTool(t,btn){
+  S.tool=t;
+  document.querySelectorAll('.tb').forEach(b=>b.classList.remove('on'));
+  if(btn)btn.classList.add('on');
+  document.getElementById('sTl').textContent=t.replace('mlin','Linear').replace('marea','Area').replace('mang','Angle').replace(/\b\w/g,c=>c.toUpperCase());
+  if(t.startsWith('m')){S.mPts=[];showT('📏 Click to place points. Dbl-click to finish.');}
+}
+function clearMeas(){ S.mPts=[]; const el=document.getElementById('mpanel'); if(el) el.innerHTML='<div class="empty">Use measure tools then click canvas</div>'; showT('✕ Cleared'); }
+function fitScreen(){
+  S.pan={x:0,y:0}; S.zoom=100; updateZB(); showT('⊡ Fit to screen');
+}
+function adjZ(d){ S.zoom=Math.max(3,Math.min(2000,S.zoom+d)); updateZB(); }
+function resetZ(){ S.zoom=100; S.pan={x:0,y:0}; updateZB(); }
+function updateZB(){ document.getElementById('ZB').textContent=Math.round(S.zoom)+'%'; }
+function toggleGrid(){ S.grid=!S.grid; showT(S.grid?'⊞ Grid on':'⊟ Grid off'); }
+function setView(v){ S.viewAngle=v; showT('👁 View: '+v.toUpperCase()); }
+function switchLayout(n,btn){ document.querySelectorAll('#lBtns .tb').forEach(b=>b.classList.remove('on')); btn.classList.add('on'); showT('📄 Layout: '+n); }
+function goBack(){ if(S.vIdx>0){S.vIdx--;const v=S.vHist[S.vIdx];S.pan={...v.pan};S.zoom=v.zoom;updateZB();} }
+function goFwd(){ if(S.vIdx<S.vHist.length-1){S.vIdx++;const v=S.vHist[S.vIdx];S.pan={...v.pan};S.zoom=v.zoom;updateZB();} }
+
+function setMode(mode,btn){
+  S.mode=mode;
+  document.querySelectorAll('.htab').forEach(b=>b.classList.remove('on'));
+  if(btn)btn.classList.add('on');
+  document.getElementById('sMd').textContent=mode==='dwg'?'DWG':'NWD/NWC';
+  document.getElementById('lLbl').style.display=mode==='dwg'?'':'none';
+  document.getElementById('lBtns').style.display=mode==='dwg'?'flex':'none';
+  document.getElementById('sZW').style.display=mode==='nwd'?'':'none';
+  if(mode==='nwd')buildClash();else buildSection();
+  showT(mode==='dwg'?'📐 DWG viewer':'🧊 3D NWD/NWC viewer');
+}
+
+function showPP(name,btn){
+  ['layers','tree','props'].forEach(n=>{
+    document.getElementById('pp-'+n).classList.toggle('h',n!==name);
+  });
+  document.querySelectorAll('.ptab').forEach(b=>b.classList.remove('on'));
+  if(btn)btn.classList.add('on');
+}
+
+// ══════════════════════════════════════════════════════════
+//  EXPORT / SHARE / TOAST
+// ══════════════════════════════════════════════════════════
+function doExport(){
+  const cv=document.getElementById('MC');
+  const a=document.createElement('a');
+  a.download='syncdrawing-export.png';
+  a.href=cv.toDataURL('image/png');
+  a.click();
+  showT('⬆ Exported as PNG');
+}
+function doShare(){
+  navigator.clipboard.writeText(window.location.href).catch(()=>{});
+  showT('🔗 Link copied to clipboard');
+}
+let _tt;
+function showT(msg){
+  const t=document.getElementById('T');
+  t.textContent=msg; t.classList.add('show');
+  clearTimeout(_tt); _tt=setTimeout(()=>t.classList.remove('show'),2500);
+}
 </script>
 </body>
 </html>
